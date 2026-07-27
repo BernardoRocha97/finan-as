@@ -24,6 +24,15 @@ const nav = [
   { href: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 
+// Itens visíveis na barra inferior do móvel (os mais usados)
+const mobileNav = [
+  { href: "/dashboard", label: "Início", icon: LayoutDashboard },
+  { href: "/transacoes", label: "Transações", icon: ArrowLeftRight },
+  { href: "/contas", label: "Contas", icon: Landmark },
+  { href: "/investimentos", label: "Investir", icon: TrendingUp },
+  { href: "/configuracoes", label: "Mais", icon: Settings },
+];
+
 export function Sidebar() {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
@@ -40,51 +49,73 @@ export function Sidebar() {
   }, []);
 
   return (
-    <aside className="w-60 flex flex-col border-r bg-card h-full shrink-0">
-      <div className="p-4 border-b">
-        <span className="font-bold text-lg tracking-tight">Finanças</span>
-      </div>
-      <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
-        {nav.map(({ href, label, icon: Icon }) => (
+    <>
+      {/* Sidebar — só visível em desktop */}
+      <aside className="hidden md:flex w-60 flex-col border-r bg-card h-full shrink-0">
+        <div className="p-4 border-b">
+          <span className="font-bold text-lg tracking-tight">Finanças</span>
+        </div>
+        <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
+          {nav.map(({ href, label, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                pathname.startsWith(href)
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              )}
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              {label}
+            </Link>
+          ))}
+        </nav>
+        <div className="p-4 border-t space-y-2">
+          {netWorth !== null && (
+            <div className="text-xs text-muted-foreground">
+              <div>Net Worth</div>
+              <div className={cn("font-semibold text-sm", netWorth >= 0 ? "text-green-600" : "text-red-500")}>
+                {formatCurrency(netWorth)}
+              </div>
+            </div>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start gap-2"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            suppressHydrationWarning
+          >
+            {mounted ? (
+              theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />
+            ) : (
+              <Moon className="h-4 w-4" />
+            )}
+            {mounted ? (theme === "dark" ? "Modo claro" : "Modo escuro") : "Modo escuro"}
+          </Button>
+        </div>
+      </aside>
+
+      {/* Barra de navegação inferior — só visível no móvel */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t flex items-stretch h-16 safe-area-bottom">
+        {mobileNav.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}
             className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+              "flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors",
               pathname.startsWith(href)
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                ? "text-primary"
+                : "text-muted-foreground"
             )}
           >
-            <Icon className="h-4 w-4 shrink-0" />
+            <Icon className={cn("h-5 w-5", pathname.startsWith(href) ? "text-primary" : "text-muted-foreground")} />
             {label}
           </Link>
         ))}
       </nav>
-      <div className="p-4 border-t space-y-2">
-        {netWorth !== null && (
-          <div className="text-xs text-muted-foreground">
-            <div>Net Worth</div>
-            <div className={cn("font-semibold text-sm", netWorth >= 0 ? "text-green-600" : "text-red-500")}>
-              {formatCurrency(netWorth)}
-            </div>
-          </div>
-        )}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full justify-start gap-2"
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          suppressHydrationWarning
-        >
-          {mounted ? (
-            theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />
-          ) : (
-            <Moon className="h-4 w-4" />
-          )}
-          {mounted ? (theme === "dark" ? "Modo claro" : "Modo escuro") : "Modo escuro"}
-        </Button>
-      </div>
-    </aside>
+    </>
   );
 }
