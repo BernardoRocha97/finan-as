@@ -1,0 +1,228 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Account {
+  id           String   @id @default(uuid())
+  nome         String
+  tipo         String   @default("CORRENTE")
+  saldo        Decimal  @default(0)
+  banco        String
+  iban         String?
+  cor          String   @default("#3b82f6")
+  notas        String?
+  ativa        Boolean  @default(true)
+  criadoEm    DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  transacoes     Transaction[]         @relation("AccountTransactions")
+  transacoesDest Transaction[]         @relation("AccountDestTransactions")
+  investOps      InvestmentTransaction[]
+}
+
+model Category {
+  id       String   @id @default(uuid())
+  nome     String
+  cor      String   @default("#6b7280")
+  icone    String   @default("tag")
+  tipo     String   @default("AMBOS")
+  parentId String?
+  parent   Category?  @relation("Subcategories", fields: [parentId], references: [id])
+  filhas   Category[] @relation("Subcategories")
+  ativa    Boolean  @default(true)
+
+  transacoes Transaction[]
+  objetivos  Goal[]
+  regras     CategoryRule[]
+}
+
+model Transaction {
+  id            String    @id @default(uuid())
+  data          DateTime
+  descricao     String
+  valor         Decimal
+  tipo          String
+  categoryId    String?
+  category      Category? @relation(fields: [categoryId], references: [id])
+  accountId     String
+  account       Account   @relation("AccountTransactions", fields: [accountId], references: [id])
+  accountDestId String?
+  accountDest   Account?  @relation("AccountDestTransactions", fields: [accountDestId], references: [id])
+  notas         String?
+  referencia    String?
+  importada     Boolean   @default(false)
+  revisada      Boolean   @default(true)
+  criadoEm    DateTime  @default(now())
+  atualizadoEm DateTime  @updatedAt
+}
+
+model Goal {
+  id         String    @id @default(uuid())
+  nome       String
+  tipo       String
+  valorAlvo  Decimal
+  valorAtual Decimal   @default(0)
+  dataInicio DateTime  @default(now())
+  dataLimite DateTime?
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+  cor        String    @default("#10b981")
+  icone      String    @default("target")
+  ativa      Boolean   @default(true)
+  notas      String?
+  criadoEm   DateTime  @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  contribuicoes GoalContribution[]
+}
+
+model GoalContribution {
+  id     String   @id @default(uuid())
+  goalId String
+  goal   Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  valor  Decimal
+  data   DateTime @default(now())
+  notas  String?
+}
+
+model Investment {
+  id                     String   @id @default(uuid())
+  nome                   String
+  ticker                 String
+  tipo                   String
+  quantidade             Decimal  @default(0)
+  precoMedioCompra       Decimal  @default(0)
+  valorAtualUnidade      Decimal  @default(0)
+  plataforma             String?
+  dividendYieldCalculado Decimal  @default(0)
+  notas                  String?
+  ativa                  Boolean  @default(true)
+  criadoEm              DateTime @default(now())
+  atualizadoEm          DateTime @updatedAt
+
+  operacoes InvestmentTransaction[]
+}
+
+model InvestmentTransaction {
+  id             String     @id @default(uuid())
+  investmentId   String
+  investment     Investment @relation(fields: [investmentId], references: [id], onDelete: Cascade)
+  tipo           String
+  data           DateTime
+  quantidade     Decimal?
+  preco          Decimal?
+  comissao       Decimal    @default(0)
+  valorDividendo Decimal?
+  accountId      String?
+  account        Account?   @relation(fields: [accountId], references: [id])
+  notas          String?
+  criadoEm      DateTime   @default(now())
+}
+
+model Property {
+  id            String   @id @default(uuid())
+  nome          String
+  morada        String?
+  valorEstimado Decimal
+  valorCompra   Decimal
+  dataCompra    DateTime
+  areaMt2       Decimal?
+  precoPorMt2   Decimal?
+  cor           String   @default("#f59e0b")
+  notas         String?
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  hipoteca Mortgage?
+}
+
+model Mortgage {
+  id              String   @id @default(uuid())
+  propertyId      String   @unique
+  property        Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  banco           String
+  valorInicial    Decimal
+  capitalEmDivida Decimal
+  taxaJuro        Decimal
+  tipoTaxa        String   @default("FIXA")
+  spread          Decimal  @default(0)
+  prestacaoMensal Decimal
+  dataInicio      DateTime
+  dataFim         DateTime?
+  prazoAnos       Int
+  criadoEm       DateTime @default(now())
+  atualizadoEm   DateTime @updatedAt
+
+  pagamentos MortgagePayment[]
+}
+
+model MortgagePayment {
+  id                String   @id @default(uuid())
+  mortgageId        String
+  mortgage          Mortgage @relation(fields: [mortgageId], references: [id], onDelete: Cascade)
+  data              DateTime
+  valorPago         Decimal
+  capitalAmortizado Decimal
+  juros             Decimal
+  notas             String?
+  criadoEm         DateTime @default(now())
+}
+
+model NetWorthSnapshot {
+  id            String   @id @default(uuid())
+  data          DateTime @unique
+  totalAtivos   Decimal
+  totalPassivos Decimal
+  netWorth      Decimal
+  breakdown     String
+  criadoEm     DateTime @default(now())
+}
+
+model MonthlyReport {
+  id                    String   @id @default(uuid())
+  ano                   Int
+  mes                   Int
+  totalReceitas         Decimal
+  totalDespesas         Decimal
+  saldo                 Decimal
+  taxaPoupanca          Decimal
+  despesasPorCategoria  String
+  comparacaoMesAnterior String
+  criadoEm             DateTime @default(now())
+
+  @@unique([ano, mes])
+}
+
+model ImportLog {
+  id          String   @id @default(uuid())
+  ficheiro    String
+  formato     String
+  banco       String?
+  totalLinhas Int
+  importadas  Int
+  duplicadas  Int
+  erros       Int
+  criadoEm   DateTime @default(now())
+}
+
+model CategoryRule {
+  id         String   @id @default(uuid())
+  padrao     String
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  prioridade Int      @default(0)
+  criadoEm  DateTime @default(now())
+}
+
+model Preference {
+  id                       String  @id @default("singleton")
+  metaTaxaPoupanca         Decimal @default(20)
+  rendimentoAnualEsperado  Decimal @default(7)
+  mostrarFireNumber        Boolean @default(false)
+  fireMultiplicador        Decimal @default(25)
+  contribuicaoMensalDefault Decimal @default(0)
+}

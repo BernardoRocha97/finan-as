@@ -1,0 +1,49 @@
+
+> financas@0.1.0 dev:clean
+> rd /s /q .next 2>nul & next dev
+
+▲ Next.js 16.2.9 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.72:3000
+- Environments: .env.local, .env
+✓ Ready in 1274ms
+
+[relatório] Email enviado para bernardorocha97@gmail.com
+○ Compiling /dashboard ...
+ GET /dashboard 200 in 4.6s (next.js: 4.1s, application-code: 455ms)
+ GET /dashboard 200 in 88ms (next.js: 6ms, application-code: 82ms)
+ GET /dashboard 200 in 102ms (next.js: 11ms, application-code: 91ms)
+[browser] StreamMiddleware - Unknown response id "3403264330" (file://C:/Users/berna/OneDrive/Ambiente de Trabalho/financas/.next/dev/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477:13)
+[browser] StreamMiddleware - Unknown response id "3403264328" (file://C:/Users/berna/OneDrive/Ambiente de Trabalho/financas/.next/dev/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477:13)
+ GET /api/transacoes/resumo-mensal 200 in 792ms (next.js: 712ms, application-code: 81ms)
+ GET /api/contas/resumo 200 in 868ms (next.js: 858ms, application-code: 11ms)
+ GET /api/relatorios/patrimonio 200 in 945ms (next.js: 924ms, application-code: 21ms)
+ GET /api/transacoes/por-categoria?inicio=2026-06-30T23:00:00.000Z&fim=2026-07-31T22:59:59.999Z 200 in 1018ms (next.js: 1006ms, application-code: 12ms)
+ GET /api/objetivos 200 in 1146ms (next.js: 1130ms, application-code: 17ms)
+ GET /api/transacoes?limite=10 200 in 1221ms (next.js: 1198ms, application-code: 23ms)
+ GET /api/transacoes?naoRevisadas=1&limite=1 200 in 20ms (next.js: 8ms, application-code: 12ms)
+ GET /api/relatorios/patrimonio 200 in 34ms (next.js: 21ms, application-code: 12ms)
+ GET /api/imoveis 200 in 166ms (next.js: 155ms, application-code: 11ms)
+ GET /gestao-mensal 200 in 1196ms (next.js: 1166ms, application-code: 30ms)
+ GET /api/gestao-mensal?periodo=mes&mes=2026-07 200 in 269ms (next.js: 248ms, application-code: 21ms)
+ GET /api/gestao-mensal?periodo=mes&mes=2026-07 200 in 16ms (next.js: 4ms, application-code: 12ms)
+ GET /contas 200 in 943ms (next.js: 913ms, application-code: 30ms)
+ GET /api/contas 200 in 195ms (next.js: 184ms, application-code: 11ms)
+ GET /api/contas 200 in 12ms (next.js: 3ms, application-code: 8ms)
+ GET /investimentos 200 in 1101ms (next.js: 1074ms, application-code: 27ms)
+ GET /api/contas 200 in 21ms (next.js: 8ms, application-code: 13ms)
+ GET /api/contas 200 in 17ms (next.js: 7ms, application-code: 10ms)
+ GET /api/investimentos/projecao?anos=20 200 in 232ms (next.js: 216ms, application-code: 16ms)
+ GET /api/investimentos/resumo 200 in 299ms (next.js: 292ms, application-code: 8ms)
+ GET /api/investimentos 200 in 356ms (next.js: 341ms, application-code: 15ms)
+ GET /api/investimentos/projecao?anos=20 200 in 13ms (next.js: 5ms, application-code: 8ms)
+ GET /api/investimentos/resumo 200 in 24ms (next.js: 15ms, application-code: 8ms)
+ GET /api/investimentos 200 in 36ms (next.js: 26ms, application-code: 9ms)
+ POST /api/investimentos/atualizar-precos 200 in 1383ms (next.js: 110ms, application-code: 1273ms)
+ GET /api/investimentos 200 in 15ms (next.js: 7ms, application-code: 8ms)
+ GET /api/investimentos/resumo 200 in 26ms (next.js: 18ms, application-code: 8ms)
+ GET /api/investimentos/projecao?anos=20 200 in 41ms (next.js: 30ms, application-code: 10ms)
+ GET /api/contas 200 in 53ms (next.js: 43ms, application-code: 10ms)
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+  Reload env: .env.local
+  Reload env: .env.local
