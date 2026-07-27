@@ -6,6 +6,15 @@ import { Sidebar } from "@/components/layout/Sidebar";
 export const metadata: Metadata = {
   title: "Finanças Pessoais",
   description: "Gestão financeira pessoal",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Finanças",
+  },
+  icons: {
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
