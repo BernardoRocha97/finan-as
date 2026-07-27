@@ -5,7 +5,7 @@ import { toNumber } from "@/lib/utils";
 
 export async function GET() {
   const contas = await prisma.account.findMany({ where: { ativa: true } });
-  const total = contas.reduce((s, c) => s + toNumber(c.saldo), 0);
+  const total = contas.reduce((s: number, c) => s + toNumber(c.saldo), 0);
   const porTipo: Record<string, number> = {};
   for (const c of contas) {
     porTipo[c.tipo] = (porTipo[c.tipo] ?? 0) + toNumber(c.saldo);
