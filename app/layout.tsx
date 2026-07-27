@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { MobileHeader } from "@/components/layout/MobileHeader";
 
 export const metadata: Metadata = {
   title: "Finanças Pessoais",
@@ -22,7 +23,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="pt" suppressHydrationWarning>
       <body>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <div className="flex h-screen overflow-hidden bg-background">
+          <MobileHeader />
+          <div className="flex h-screen overflow-hidden bg-background pt-14 md:pt-0">
             <Sidebar />
             <main className="flex-1 overflow-y-auto pb-16 md:pb-0">
               {children}

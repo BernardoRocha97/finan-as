@@ -24,13 +24,12 @@ const nav = [
   { href: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 
-// Itens visíveis na barra inferior do móvel (os mais usados)
 const mobileNav = [
   { href: "/dashboard", label: "Início", icon: LayoutDashboard },
   { href: "/transacoes", label: "Transações", icon: ArrowLeftRight },
   { href: "/contas", label: "Contas", icon: Landmark },
   { href: "/investimentos", label: "Investir", icon: TrendingUp },
-  { href: "/configuracoes", label: "Mais", icon: Settings },
+  { href: "/importar", label: "Importar", icon: Upload },
 ];
 
 export function Sidebar() {
@@ -50,7 +49,7 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Sidebar — só visível em desktop */}
+      {/* Sidebar desktop */}
       <aside className="hidden md:flex w-60 flex-col border-r bg-card h-full shrink-0">
         <div className="p-4 border-b">
           <span className="font-bold text-lg tracking-tight">Finanças</span>
@@ -98,23 +97,28 @@ export function Sidebar() {
         </div>
       </aside>
 
-      {/* Barra de navegação inferior — só visível no móvel */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t flex items-stretch h-16 safe-area-bottom">
-        {mobileNav.map(({ href, label, icon: Icon }) => (
-          <Link
-            key={href}
-            href={href}
-            className={cn(
-              "flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors",
-              pathname.startsWith(href)
-                ? "text-primary"
-                : "text-muted-foreground"
-            )}
-          >
-            <Icon className={cn("h-5 w-5", pathname.startsWith(href) ? "text-primary" : "text-muted-foreground")} />
-            {label}
-          </Link>
-        ))}
+      {/* Bottom nav móvel */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur border-t flex items-stretch" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+        {mobileNav.map(({ href, label, icon: Icon }) => {
+          const active = pathname.startsWith(href);
+          return (
+            <Link
+              key={href}
+              href={href}
+              className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 transition-colors"
+            >
+              <div className={cn(
+                "rounded-xl px-3 py-1 transition-all",
+                active ? "bg-primary/10" : ""
+              )}>
+                <Icon className={cn("h-5 w-5", active ? "text-primary" : "text-muted-foreground")} />
+              </div>
+              <span className={cn("text-[10px] font-medium", active ? "text-primary" : "text-muted-foreground")}>
+                {label}
+              </span>
+            </Link>
+          );
+        })}
       </nav>
     </>
   );
