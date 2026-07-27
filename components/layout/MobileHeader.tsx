@@ -2,13 +2,12 @@
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
-import { Sun, Moon, Menu } from "lucide-react";
+import { Sun, Moon, Menu, X, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import Link from "next/link";
 import {
   LayoutDashboard, Landmark, TrendingUp, Home, ArrowLeftRight,
-  Upload, Target, BarChart3, Settings, CalendarRange, Wallet, LogOut,
+  Upload, Target, BarChart3, Settings, CalendarRange, Wallet,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 
@@ -48,66 +47,86 @@ export function MobileHeader() {
 
   useEffect(() => setMounted(true), []);
 
+  // Fechar drawer ao navegar
+  useEffect(() => { setOpen(false); }, [pathname]);
+
   const title = Object.entries(titles).find(([k]) => pathname.startsWith(k))?.[1] ?? "Finanças";
 
   return (
-    <header className="md:hidden fixed top-0 left-0 right-0 z-50 h-14 bg-card border-b flex items-center px-4 gap-3">
-      {/* Menu lateral */}
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetTrigger asChild>
-          <button className="p-1.5 rounded-lg hover:bg-accent transition-colors">
-            <Menu className="h-5 w-5" />
+    <>
+      {/* Header fixo */}
+      <header className="md:hidden fixed top-0 left-0 right-0 z-50 h-14 bg-card/95 backdrop-blur border-b flex items-center px-4 gap-3">
+        <button
+          onClick={() => setOpen(true)}
+          className="p-1.5 rounded-lg hover:bg-accent transition-colors"
+          aria-label="Menu"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+
+        <span className="font-semibold text-base flex-1 truncate">{title}</span>
+
+        <button
+          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          className="p-1.5 rounded-lg hover:bg-accent transition-colors"
+          suppressHydrationWarning
+        >
+          {mounted ? (
+            theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />
+          ) : (
+            <Moon className="h-5 w-5" />
+          )}
+        </button>
+      </header>
+
+      {/* Overlay */}
+      {open && (
+        <div
+          className="md:hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+          onClick={() => setOpen(false)}
+        />
+      )}
+
+      {/* Drawer lateral */}
+      <div className={cn(
+        "md:hidden fixed top-0 left-0 bottom-0 z-50 w-72 bg-card flex flex-col transition-transform duration-300 ease-in-out",
+        open ? "translate-x-0" : "-translate-x-full"
+      )}>
+        <div className="h-14 flex items-center justify-between px-5 border-b shrink-0">
+          <span className="font-bold text-base">Finanças Pessoais</span>
+          <button onClick={() => setOpen(false)} className="p-1.5 rounded-lg hover:bg-accent">
+            <X className="h-5 w-5" />
           </button>
-        </SheetTrigger>
-        <SheetContent side="left" className="w-72 p-0">
-          <div className="p-5 border-b">
-            <span className="font-bold text-lg">Finanças Pessoais</span>
-          </div>
-          <nav className="p-3 space-y-0.5 flex-1 overflow-y-auto">
-            {nav.map(({ href, label, icon: Icon }) => (
-              <Link
-                key={href}
-                href={href}
-                onClick={() => setOpen(false)}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors",
-                  pathname.startsWith(href)
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                )}
-              >
-                <Icon className="h-5 w-5 shrink-0" />
-                {label}
-              </Link>
-            ))}
-          </nav>
-          <div className="p-3 border-t">
-            <button
-              onClick={() => signOut({ callbackUrl: "/login" })}
-              className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 w-full transition-colors"
+        </div>
+
+        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+          {nav.map(({ href, label, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              className={cn(
+                "flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors",
+                pathname.startsWith(href)
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              )}
             >
-              <LogOut className="h-5 w-5" />
-              Terminar sessão
-            </button>
-          </div>
-        </SheetContent>
-      </Sheet>
+              <Icon className="h-5 w-5 shrink-0" />
+              {label}
+            </Link>
+          ))}
+        </nav>
 
-      {/* Título da página */}
-      <span className="font-semibold text-base flex-1">{title}</span>
-
-      {/* Toggle tema */}
-      <button
-        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-        className="p-1.5 rounded-lg hover:bg-accent transition-colors"
-        suppressHydrationWarning
-      >
-        {mounted ? (
-          theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />
-        ) : (
-          <Moon className="h-5 w-5" />
-        )}
-      </button>
-    </header>
+        <div className="p-3 border-t shrink-0" style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
+          <button
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 w-full transition-colors"
+          >
+            <LogOut className="h-5 w-5" />
+            Terminar sessão
+          </button>
+        </div>
+      </div>
+    </>
   );
 }
