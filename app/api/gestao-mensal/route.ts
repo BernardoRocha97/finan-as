@@ -115,6 +115,7 @@ export async function GET(req: NextRequest) {
 
   const despesasAll = transacoes.filter((t) => t.tipo === "DESPESA");
   const receitasAll = transacoes.filter((t) => t.tipo === "RECEITA");
+  const investimentosAll = transacoes.filter((t) => t.tipo === "INVESTIMENTO");
 
   // Apply category filter if provided
   const filterByCat = (arr: typeof despesasAll) =>
@@ -122,6 +123,7 @@ export async function GET(req: NextRequest) {
 
   const topDespesas = filterByCat(despesasAll).map(mapTx);
   const topReceitas = filterByCat(receitasAll).map(mapTx);
+  const topInvestimentos = investimentosAll.map(mapTx);
 
   // All unique categories for filter UI
   const todasCategorias = Array.from(new Set(transacoes
@@ -132,6 +134,7 @@ export async function GET(req: NextRequest) {
   // Totals (exclude INVESTIMENTO)
   const totalReceitas = receitasAll.reduce((s, t) => s + toNumber(t.valor), 0);
   const totalDespesas = despesasAll.reduce((s, t) => s + toNumber(t.valor), 0);
+  const totalInvestimentos = investimentosAll.reduce((s, t) => s + toNumber(t.valor), 0);
 
   return NextResponse.json({
     data: {
@@ -140,12 +143,14 @@ export async function GET(req: NextRequest) {
       receitasCat,
       topDespesas,
       topReceitas,
+      topInvestimentos,
       todasCategorias,
       totais: {
         receitas: Math.round(totalReceitas * 100) / 100,
         despesas: Math.round(totalDespesas * 100) / 100,
         saldo: Math.round((totalReceitas - totalDespesas) * 100) / 100,
         taxaPoupanca: totalReceitas > 0 ? Math.round(((totalReceitas - totalDespesas) / totalReceitas) * 1000) / 10 : 0,
+        investimentos: Math.round(totalInvestimentos * 100) / 100,
       },
       periodo: { inicio: inicio.toISOString(), fim: fim.toISOString() },
     },

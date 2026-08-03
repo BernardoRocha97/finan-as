@@ -56,8 +56,9 @@ interface ApiData {
   receitasCat: CatData[];
   topDespesas: TxData[];
   topReceitas: TxData[];
+  topInvestimentos: TxData[];
   todasCategorias: string[];
-  totais: { receitas: number; despesas: number; saldo: number; taxaPoupanca: number };
+  totais: { receitas: number; despesas: number; saldo: number; taxaPoupanca: number; investimentos: number };
   periodo: { inicio: string; fim: string };
 }
 
@@ -85,7 +86,7 @@ function DeltaChip({ value, inverted = false, suffix = "" }: { value: number; in
 }
 
 function StatBox({ label, value, sub, color = "default" }: { label: string; value: string; sub?: React.ReactNode; color?: "green" | "red" | "blue" | "default" }) {
-  const colors = { green: "text-emerald-500", red: "text-red-500", blue: "text-blue-500", default: "" };
+  const colors = { green: "text-emerald-500", red: "text-red-500", blue: "text-blue-600", default: "" };
   return (
     <div className="text-center p-4">
       <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">{label}</p>
@@ -226,7 +227,7 @@ export default function GestaoMensalPage() {
       </div>
 
       {/* ── KPIs ─────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-0 border rounded-xl overflow-hidden divide-x divide-y lg:divide-y-0">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-0 border rounded-xl overflow-hidden divide-x divide-y lg:divide-y-0">
         <StatBox
           label="Total Receitas"
           value={formatCurrency(totalReceitas)}
@@ -267,6 +268,12 @@ export default function GestaoMensalPage() {
             </div>
           }
         />
+        <StatBox
+          label="Investimentos"
+          value={formatCurrency(data?.totais.investimentos ?? 0)}
+          color="blue"
+          sub={<span className="text-xs text-muted-foreground">{data?.topInvestimentos.length ?? 0} movimentos</span>}
+        />
       </div>
 
       {/* ── Tabs ─────────────────────────────────────────────── */}
@@ -275,6 +282,14 @@ export default function GestaoMensalPage() {
           <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
           <TabsTrigger value="despesas">Despesas</TabsTrigger>
           <TabsTrigger value="receitas">Receitas</TabsTrigger>
+          <TabsTrigger value="investimentos">
+            Investimentos
+            {(data?.totais.investimentos ?? 0) > 0 && (
+              <span className="ml-1.5 text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded px-1 py-0.5">
+                {formatCurrency(data!.totais.investimentos)}
+              </span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="evolucao">Evolução</TabsTrigger>
         </TabsList>
 
@@ -678,6 +693,65 @@ export default function GestaoMensalPage() {
                   </tbody>
                 </table>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Tab: Investimentos ──────────────────────────────── */}
+        <TabsContent value="investimentos" className="space-y-6 mt-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">Movimentos de investimento</CardTitle>
+                <Badge variant="outline" className="text-blue-600">
+                  Total: {formatCurrency(data?.totais.investimentos ?? 0)}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {(data?.topInvestimentos.length ?? 0) === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-10">
+                  Sem investimentos no período. Marca uma transação como "📈 Investimento" na página de Transações.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="text-left px-4 py-2.5 font-medium">Data</th>
+                        <th className="text-left px-4 py-2.5 font-medium">Descrição</th>
+                        <th className="text-left px-4 py-2.5 font-medium">Categoria</th>
+                        <th className="text-left px-4 py-2.5 font-medium">Conta</th>
+                        <th className="text-right px-4 py-2.5 font-medium">Valor</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {(data?.topInvestimentos ?? []).map((t) => (
+                        <tr key={t.id} className="hover:bg-muted/30 transition-colors">
+                          <td className="px-4 py-2 text-muted-foreground whitespace-nowrap">{formatDate(t.data)}</td>
+                          <td className="px-4 py-2 max-w-[240px] truncate">{t.descricao}</td>
+                          <td className="px-4 py-2">
+                            <span className="inline-flex items-center gap-1.5 text-xs">
+                              <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: t.categoriaCor }} />
+                              {t.categoria}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2 text-muted-foreground text-xs">{t.conta}</td>
+                          <td className="px-4 py-2 text-right font-semibold text-blue-600">
+                            📈 {formatCurrency(t.valor)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t bg-muted/30 font-semibold">
+                        <td className="px-4 py-2.5" colSpan={4}>Total investido no período</td>
+                        <td className="px-4 py-2.5 text-right text-blue-600">{formatCurrency(data?.totais.investimentos ?? 0)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
