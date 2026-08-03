@@ -128,11 +128,33 @@ function InlineCategoryPicker({ transacao, categorias, onSaved }: { transacao: a
     onSaved();
   };
 
+  const marcarInvestimento = async () => {
+    setSaving(true);
+    await fetch(`/api/transacoes/${transacao.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tipo: "INVESTIMENTO", revisada: true }),
+    });
+    setSaving(false);
+    setOpen(false);
+    onSaved();
+  };
+
+  const isInvestimento = transacao.tipo === "INVESTIMENTO";
   const hasCategory = transacao.category && transacao.category.id !== "Outros";
 
   return (
     <div className="relative" ref={ref}>
-      {hasCategory ? (
+      {isInvestimento ? (
+        <button
+          ref={btnRef}
+          onClick={() => setOpen(!open)}
+          title="Clica para mudar"
+          className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded px-2 py-0.5 hover:opacity-70 transition-opacity"
+        >
+          📈 Investimento
+        </button>
+      ) : hasCategory ? (
         <button
           ref={btnRef}
           onClick={() => setOpen(!open)}
@@ -153,7 +175,42 @@ function InlineCategoryPicker({ transacao, categorias, onSaved }: { transacao: a
         </button>
       )}
       {open && (
-        <div className={`absolute left-0 z-50 bg-popover border rounded-lg shadow-lg p-1 min-w-[190px] max-h-64 overflow-y-auto ${dropUp ? "bottom-full mb-1" : "top-full mt-1"}`}>
+        <div className={`absolute left-0 z-50 bg-popover border rounded-lg shadow-lg p-1 min-w-[200px] max-h-72 overflow-y-auto ${dropUp ? "bottom-full mb-1" : "top-full mt-1"}`}>
+          {!isInvestimento && (
+            <>
+              <button
+                onClick={marcarInvestimento}
+                disabled={saving}
+                className="w-full text-left px-3 py-1.5 text-sm rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 flex items-center gap-2 text-blue-600 font-medium"
+              >
+                <span className="text-base">📈</span>
+                Marcar como Investimento
+              </button>
+              <div className="border-t my-1" />
+            </>
+          )}
+          {isInvestimento && (
+            <>
+              <button
+                onClick={async () => {
+                  setSaving(true);
+                  await fetch(`/api/transacoes/${transacao.id}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ tipo: "DESPESA", revisada: true }),
+                  });
+                  setSaving(false);
+                  setOpen(false);
+                  onSaved();
+                }}
+                disabled={saving}
+                className="w-full text-left px-3 py-1.5 text-sm rounded hover:bg-muted flex items-center gap-2 text-muted-foreground"
+              >
+                ↩ Reverter para Despesa
+              </button>
+              <div className="border-t my-1" />
+            </>
+          )}
           {categorias.map((c) => (
             <button
               key={c.id}
@@ -290,8 +347,8 @@ export default function TransacoesPage() {
                       <InlineCategoryPicker transacao={t} categorias={categorias} onSaved={load} />
                     </td>
                     <td className="px-4 py-2 text-muted-foreground hidden lg:table-cell">{t.account?.nome}</td>
-                    <td className={cn("px-4 py-2 text-right font-medium", t.tipo === "RECEITA" ? "text-green-600" : t.tipo === "DESPESA" ? "text-red-500" : "text-muted-foreground")}>
-                      {t.tipo === "RECEITA" ? "+" : t.tipo === "DESPESA" ? "-" : ""}{formatCurrency(toNumber(t.valor))}
+                    <td className={cn("px-4 py-2 text-right font-medium", t.tipo === "RECEITA" ? "text-green-600" : t.tipo === "DESPESA" ? "text-red-500" : t.tipo === "INVESTIMENTO" ? "text-blue-600" : "text-muted-foreground")}>
+                      {t.tipo === "RECEITA" ? "+" : t.tipo === "DESPESA" ? "-" : t.tipo === "INVESTIMENTO" ? "📈" : ""}{formatCurrency(toNumber(t.valor))}
                     </td>
                     <td className="px-4 py-2">
                       <div className="flex gap-1">
