@@ -8,7 +8,7 @@ const schema = z.object({
   data: z.string().optional(),
   descricao: z.string().optional(),
   valor: z.number().positive().optional(),
-  tipo: z.enum(["DESPESA", "RECEITA", "TRANSFERENCIA"]).optional(),
+  tipo: z.enum(["DESPESA", "RECEITA", "TRANSFERENCIA", "INVESTIMENTO"]).optional(),
   categoryId: z.string().optional().nullable(),
   accountId: z.string().optional(),
   notas: z.string().optional(),
