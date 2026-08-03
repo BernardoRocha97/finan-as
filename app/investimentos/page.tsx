@@ -106,6 +106,82 @@ function OpForm({ investmentId, contas, onSave, onClose }: any) {
   );
 }
 
+// ── Movimentos de Investimento Panel ─────────────────────────────────────────
+
+function MovimentosInvestimentoPanel() {
+  const [movimentos, setMovimentos] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [pagina, setPagina] = useState(1);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    fetch(`/api/transacoes?tipo=INVESTIMENTO&pagina=${pagina}&limite=50`)
+      .then((r) => r.json())
+      .then((d) => { setMovimentos(d.data ?? []); setTotal(d.total ?? 0); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [pagina]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const totalInvestido = movimentos.reduce((s, t) => s + toNumber(t.valor), 0);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-muted-foreground">{total} movimentos classificados como investimento</p>
+        </div>
+        <Badge variant="outline" className="text-blue-600">Total: {formatCurrency(totalInvestido)}</Badge>
+      </div>
+      <div className="rounded-lg border overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-muted">
+            <tr>
+              <th className="text-left px-4 py-2.5 font-medium">Data</th>
+              <th className="text-left px-4 py-2.5 font-medium">Descrição</th>
+              <th className="text-left px-4 py-2.5 font-medium">Categoria</th>
+              <th className="text-left px-4 py-2.5 font-medium">Conta</th>
+              <th className="text-right px-4 py-2.5 font-medium">Valor</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {loading && <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">A carregar...</td></tr>}
+            {!loading && movimentos.length === 0 && (
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                Sem movimentos de investimento. Classifica uma transação como "Investimento" para aparecer aqui.
+              </td></tr>
+            )}
+            {movimentos.map((t) => (
+              <tr key={t.id} className="hover:bg-muted/30 transition-colors">
+                <td className="px-4 py-2 text-muted-foreground whitespace-nowrap">{formatDate(t.data)}</td>
+                <td className="px-4 py-2 max-w-[240px] truncate">{t.descricao}</td>
+                <td className="px-4 py-2">
+                  {t.category ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs">
+                      <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: t.category.cor }} />
+                      {t.category.nome}
+                    </span>
+                  ) : <span className="text-xs text-muted-foreground">—</span>}
+                </td>
+                <td className="px-4 py-2 text-muted-foreground text-xs">{t.account?.nome ?? "—"}</td>
+                <td className="px-4 py-2 text-right font-semibold text-blue-600">{formatCurrency(toNumber(t.valor))}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {total > 50 && (
+        <div className="flex justify-center gap-2">
+          <Button variant="outline" size="sm" disabled={pagina === 1} onClick={() => setPagina(p => p - 1)}>Anterior</Button>
+          <span className="text-sm text-muted-foreground py-2">{pagina} / {Math.ceil(total / 50)}</span>
+          <Button variant="outline" size="sm" disabled={pagina >= Math.ceil(total / 50)} onClick={() => setPagina(p => p + 1)}>Próxima</Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Dividendos Panel ─────────────────────────────────────────────────────────
 
 const MESES_PT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -1010,6 +1086,7 @@ export default function InvestimentosPage() {
         <TabsList>
           <TabsTrigger value="carteira">Carteira</TabsTrigger>
           <TabsTrigger value="dividendos">Dividendos</TabsTrigger>
+          <TabsTrigger value="movimentos">Movimentos</TabsTrigger>
           <TabsTrigger value="importar-xtb">Importar XTB</TabsTrigger>
           <TabsTrigger value="projecao">Projeção</TabsTrigger>
         </TabsList>
@@ -1076,6 +1153,10 @@ export default function InvestimentosPage() {
 
         <TabsContent value="dividendos">
           <DividendosPanel investimentos={investimentos} />
+        </TabsContent>
+
+        <TabsContent value="movimentos">
+          <MovimentosInvestimentoPanel />
         </TabsContent>
 
         <TabsContent value="importar-xtb">

@@ -48,6 +48,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const periodo = searchParams.get("periodo") ?? "mes";
   const mesRef = searchParams.get("mes"); // "YYYY-MM"
+  const categoriaFiltro = searchParams.get("categoria"); // filter by category name
 
   const { inicio, fim, meses } = getPeriod(periodo, mesRef);
 
@@ -58,7 +59,7 @@ export async function GET(req: NextRequest) {
     orderBy: { data: "desc" },
   });
 
-  // Aggregate by month
+  // Aggregate by month (exclude INVESTIMENTO from receitas/despesas)
   const porMes = meses.map((mesInicio) => {
     const mesFim = endOfMonth(mesInicio);
     const ts = transacoes.filter((t) => t.data >= mesInicio && t.data <= mesFim);
@@ -75,10 +76,11 @@ export async function GET(req: NextRequest) {
     };
   });
 
-  // By category (despesas)
+  // By category (exclude INVESTIMENTO)
   const catMap: Record<string, { nome: string; cor: string; valor: number; count: number }> = {};
   const incMap: Record<string, { nome: string; cor: string; valor: number; count: number }> = {};
   for (const t of transacoes) {
+    if (t.tipo === "INVESTIMENTO") continue;
     const cat = t.category?.nome ?? "Outros";
     const cor = t.category?.cor ?? "#6b7280";
     if (t.tipo === "DESPESA") {
@@ -100,37 +102,36 @@ export async function GET(req: NextRequest) {
     .map((c) => ({ ...c, valor: Math.round(c.valor * 100) / 100 }))
     .sort((a, b) => b.valor - a.valor);
 
-  // Top 10 despesas individuais
-  const topDespesas = transacoes
-    .filter((t) => t.tipo === "DESPESA")
-    .slice(0, 50)
-    .map((t) => ({
-      id: t.id,
-      data: t.data,
-      descricao: t.descricao,
-      valor: toNumber(t.valor),
-      categoria: t.category?.nome ?? "Outros",
-      categoriaCor: t.category?.cor ?? "#6b7280",
-      conta: t.account?.nome ?? "",
-    }));
+  const mapTx = (t: any) => ({
+    id: t.id,
+    data: t.data,
+    descricao: t.descricao,
+    valor: toNumber(t.valor),
+    categoria: t.category?.nome ?? "Outros",
+    categoriaCor: t.category?.cor ?? "#6b7280",
+    conta: t.account?.nome ?? "",
+    tipo: t.tipo,
+  });
 
-  // Top receitas
-  const topReceitas = transacoes
-    .filter((t) => t.tipo === "RECEITA")
-    .slice(0, 20)
-    .map((t) => ({
-      id: t.id,
-      data: t.data,
-      descricao: t.descricao,
-      valor: toNumber(t.valor),
-      categoria: t.category?.nome ?? "Outros",
-      categoriaCor: t.category?.cor ?? "#6b7280",
-      conta: t.account?.nome ?? "",
-    }));
+  const despesasAll = transacoes.filter((t) => t.tipo === "DESPESA");
+  const receitasAll = transacoes.filter((t) => t.tipo === "RECEITA");
 
-  // Totals
-  const totalReceitas = transacoes.filter((t) => t.tipo === "RECEITA").reduce((s, t) => s + toNumber(t.valor), 0);
-  const totalDespesas = transacoes.filter((t) => t.tipo === "DESPESA").reduce((s, t) => s + toNumber(t.valor), 0);
+  // Apply category filter if provided
+  const filterByCat = (arr: typeof despesasAll) =>
+    categoriaFiltro ? arr.filter((t) => (t.category?.nome ?? "Outros") === categoriaFiltro) : arr;
+
+  const topDespesas = filterByCat(despesasAll).map(mapTx);
+  const topReceitas = filterByCat(receitasAll).map(mapTx);
+
+  // All unique categories for filter UI
+  const todasCategorias = Array.from(new Set(transacoes
+    .filter((t) => t.tipo !== "INVESTIMENTO")
+    .map((t) => t.category?.nome ?? "Outros")
+  )).sort();
+
+  // Totals (exclude INVESTIMENTO)
+  const totalReceitas = receitasAll.reduce((s, t) => s + toNumber(t.valor), 0);
+  const totalDespesas = despesasAll.reduce((s, t) => s + toNumber(t.valor), 0);
 
   return NextResponse.json({
     data: {
@@ -139,6 +140,7 @@ export async function GET(req: NextRequest) {
       receitasCat,
       topDespesas,
       topReceitas,
+      todasCategorias,
       totais: {
         receitas: Math.round(totalReceitas * 100) / 100,
         despesas: Math.round(totalDespesas * 100) / 100,

@@ -56,6 +56,7 @@ interface ApiData {
   receitasCat: CatData[];
   topDespesas: TxData[];
   topReceitas: TxData[];
+  todasCategorias: string[];
   totais: { receitas: number; despesas: number; saldo: number; taxaPoupanca: number };
   periodo: { inicio: string; fim: string };
 }
@@ -133,14 +134,17 @@ export default function GestaoMensalPage() {
   const [data, setData] = useState<ApiData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("visao-geral");
+  const [categoriaFiltro, setCategoriaFiltro] = useState<string>("");
 
   const load = useCallback(() => {
     setLoading(true);
-    fetch(`/api/gestao-mensal?periodo=${periodo}&mes=${mesRef}`)
+    const params = new URLSearchParams({ periodo, mes: mesRef });
+    if (categoriaFiltro) params.set("categoria", categoriaFiltro);
+    fetch(`/api/gestao-mensal?${params}`)
       .then((r) => r.json())
       .then((r) => { setData(r.data); setLoading(false); })
       .catch(() => setLoading(false));
-  }, [periodo, mesRef]);
+  }, [periodo, mesRef, categoriaFiltro]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -511,9 +515,19 @@ export default function GestaoMensalPage() {
           {/* Tabela transações despesa */}
           <Card>
             <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center gap-2 justify-between">
                 <CardTitle className="text-base">Transações de despesa</CardTitle>
-                <Badge variant="outline">{data?.topDespesas.length ?? 0} mais recentes</Badge>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={categoriaFiltro}
+                    onChange={(e) => setCategoriaFiltro(e.target.value)}
+                    className="text-xs border rounded px-2 py-1 bg-background text-foreground"
+                  >
+                    <option value="">Todas as categorias</option>
+                    {(data?.todasCategorias ?? []).map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <Badge variant="outline">{data?.topDespesas.length ?? 0} transações</Badge>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -619,9 +633,19 @@ export default function GestaoMensalPage() {
           {/* Tabela receitas */}
           <Card>
             <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center gap-2 justify-between">
                 <CardTitle className="text-base">Transações de receita</CardTitle>
-                <Badge variant="outline">{data?.topReceitas.length ?? 0} registos</Badge>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={categoriaFiltro}
+                    onChange={(e) => setCategoriaFiltro(e.target.value)}
+                    className="text-xs border rounded px-2 py-1 bg-background text-foreground"
+                  >
+                    <option value="">Todas as categorias</option>
+                    {(data?.todasCategorias ?? []).map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <Badge variant="outline">{data?.topReceitas.length ?? 0} transações</Badge>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">

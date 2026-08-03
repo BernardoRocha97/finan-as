@@ -45,6 +45,7 @@ function TransacaoForm({ initial, contas, categorias, onSave, onClose }: any) {
               <SelectItem value="DESPESA">Despesa</SelectItem>
               <SelectItem value="RECEITA">Receita</SelectItem>
               <SelectItem value="TRANSFERENCIA">Transferência</SelectItem>
+              <SelectItem value="INVESTIMENTO">Investimento</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -232,6 +233,7 @@ export default function TransacoesPage() {
             <SelectItem value="DESPESA">Despesa</SelectItem>
             <SelectItem value="RECEITA">Receita</SelectItem>
             <SelectItem value="TRANSFERENCIA">Transferência</SelectItem>
+            <SelectItem value="INVESTIMENTO">Investimento</SelectItem>
           </SelectContent>
         </Select>
         <div className="flex gap-1 rounded-lg border p-1">
