@@ -498,8 +498,11 @@ function XtbImportPanel({ onDone }: { onDone: () => void }) {
     try {
       const r = await fetch("/api/xtb/importar", { method: "POST", body: fd });
       const d = await r.json();
-      if (d.error) setError(d.error);
-      else { setResult(d.data); onDone(); }
+      if (d.error) { setError(d.error); return; }
+      // Auto-update prices after import so portfolio value is correct
+      await fetch("/api/investimentos/atualizar-precos", { method: "POST" }).catch(() => {});
+      setResult(d.data);
+      onDone();
     } catch (e: any) {
       setError(e.message);
     } finally {
