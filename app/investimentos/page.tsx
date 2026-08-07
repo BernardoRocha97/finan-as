@@ -11,7 +11,7 @@ import { MoneyInput } from "@/components/ui/MoneyInput";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, Plus, Pencil, RefreshCw, AlertCircle, TrendingDown, Wallet, Activity, Download } from "lucide-react";
+import { TrendingUp, Plus, Pencil, RefreshCw, AlertCircle, TrendingDown, Wallet, Activity, Download, Trash2 } from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend, BarChart, Bar } from "recharts";
 import { format } from "date-fns";
 import { pt } from "date-fns/locale";
@@ -1022,6 +1022,7 @@ export default function InvestimentosPage() {
   const [opFor, setOpFor] = useState<string | null>(null);
   const [atualizando, setAtualizando] = useState(false);
   const [updateResult, setUpdateResult] = useState<any>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const load = () => Promise.all([
     fetch("/api/investimentos").then((r) => r.json()).then((d) => setInvestimentos(d.data ?? [])),
@@ -1043,6 +1044,12 @@ export default function InvestimentosPage() {
     } finally {
       setAtualizando(false);
     }
+  };
+
+  const deleteInvestimento = async (id: string) => {
+    await fetch(`/api/investimentos/${id}`, { method: "DELETE" });
+    setConfirmDeleteId(null);
+    load();
   };
 
   const alocacao = Object.entries(resumo?.porTipo ?? {}).map(([nome, valor], i) => ({ nome, valor, fill: CORES[i % CORES.length] }));
@@ -1122,6 +1129,7 @@ export default function InvestimentosPage() {
                         <div className="flex gap-1">
                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditing(i); setOpen(true); }}><Pencil className="h-3.5 w-3.5" /></Button>
                           <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setOpFor(i.id)}>Op.</Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => setConfirmDeleteId(i.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                         </div>
                       </td>
                     </tr>
@@ -1219,6 +1227,21 @@ export default function InvestimentosPage() {
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Registar operação</DialogTitle></DialogHeader>
           {opFor && <OpForm investmentId={opFor} contas={contas} onSave={() => { setOpFor(null); load(); }} onClose={() => setOpFor(null)} />}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!confirmDeleteId} onOpenChange={(o) => !o && setConfirmDeleteId(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Eliminar ativo</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Tens a certeza que queres eliminar este ativo? Esta ação também elimina todo o histórico de operações associado.
+          </p>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => confirmDeleteId && deleteInvestimento(confirmDeleteId)}>
+              <Trash2 className="h-4 w-4 mr-2" />Eliminar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
