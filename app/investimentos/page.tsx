@@ -20,7 +20,21 @@ const TIPOS = ["ETF", "ACAO", "PPR", "CRIPTO", "OBRIGACAO", "OUTRO"];
 const CORES = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"];
 
 function InvForm({ initial, onSave, onClose }: any) {
-  const [form, setForm] = useState({ nome: "", ticker: "", tipo: "ETF", quantidade: 0, precoMedioCompra: 0, valorAtualUnidade: 0, plataforma: "", notas: "", ...initial });
+  const [form, setForm] = useState({
+    nome: "",
+    ticker: "",
+    tipo: "ETF",
+    quantidade: 0,
+    precoMedioCompra: 0,
+    valorAtualUnidade: 0,
+    plataforma: "",
+    notas: "",
+    ...initial,
+    // Coerce Decimal/string values from DB to numbers
+    quantidade: Number(initial?.quantidade ?? 0),
+    precoMedioCompra: Number(initial?.precoMedioCompra ?? 0),
+    valorAtualUnidade: Number(initial?.valorAtualUnidade ?? 0),
+  });
   const [loading, setLoading] = useState(false);
   const save = async () => {
     setLoading(true);
@@ -45,7 +59,15 @@ function InvForm({ initial, onSave, onClose }: any) {
         <div className="space-y-1"><Label>Plataforma</Label><Input value={form.plataforma ?? ""} onChange={(e) => setForm({ ...form, plataforma: e.target.value })} /></div>
       </div>
       <div className="grid grid-cols-3 gap-4">
-        <div className="space-y-1"><Label>Quantidade</Label><Input type="number" value={form.quantidade} onChange={(e) => setForm({ ...form, quantidade: Number(e.target.value) })} /></div>
+        <div className="space-y-1">
+          <Label>Quantidade</Label>
+          <Input
+            type="number"
+            step="0.0001"
+            value={form.quantidade}
+            onChange={(e) => setForm({ ...form, quantidade: parseFloat(e.target.value) || 0 })}
+          />
+        </div>
         <div className="space-y-1"><Label>Preço médio (€)</Label><MoneyInput value={form.precoMedioCompra} onChange={(v) => setForm({ ...form, precoMedioCompra: v })} /></div>
         <div className="space-y-1"><Label>Valor atual (€)</Label><MoneyInput value={form.valorAtualUnidade} onChange={(v) => setForm({ ...form, valorAtualUnidade: v })} /></div>
       </div>
