@@ -19,7 +19,19 @@ const opSchema = z.object({
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const body = await req.json();
-  const inv = await prisma.investment.update({ where: { id }, data: body });
+  // Only pass known Investment fields to Prisma (ignore valorTotal, custo, ganhoPerda, etc.)
+  const { nome, ticker, tipo, quantidade, precoMedioCompra, valorAtualUnidade, plataforma, notas, ativa } = body;
+  const data: any = {};
+  if (nome !== undefined) data.nome = nome;
+  if (ticker !== undefined) data.ticker = ticker;
+  if (tipo !== undefined) data.tipo = tipo;
+  if (quantidade !== undefined) data.quantidade = quantidade;
+  if (precoMedioCompra !== undefined) data.precoMedioCompra = precoMedioCompra;
+  if (valorAtualUnidade !== undefined) data.valorAtualUnidade = valorAtualUnidade;
+  if (plataforma !== undefined) data.plataforma = plataforma;
+  if (notas !== undefined) data.notas = notas;
+  if (ativa !== undefined) data.ativa = ativa;
+  const inv = await prisma.investment.update({ where: { id }, data });
   return NextResponse.json({ data: inv });
 }
 
