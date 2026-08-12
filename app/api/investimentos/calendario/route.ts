@@ -16,8 +16,7 @@ function medianInterval(dates: Date[]): number {
     : intervals[mid];
 }
 
-// Group raw dividend rows into "payment events" by month (YYYY-MM).
-// Multiple rows on the same month = one payment event with summed total.
+// Group raw dividend rows into monthly buckets (each month = one payment event).
 function groupByMonth(datas: Date[], valores: number[]): { date: Date; total: number }[] {
   const byMonth: Record<string, { date: Date; total: number }> = {};
   for (let i = 0; i < datas.length; i++) {
@@ -40,6 +39,10 @@ export async function GET() {
   const mesInicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
   const mesFim = new Date(hoje.getFullYear(), hoje.getMonth() + 12, 1);
 
+  // Build lookup: investmentId → investment (with dividendYieldManual, quantidade, valorAtualUnidade)
+  const invById: Record<string, typeof investimentos[0]> = {};
+  for (const inv of investimentos) invById[inv.id] = inv;
+
   // Group raw rows by investmentId
   const rawById: Record<string, { ticker: string; nome: string; datas: Date[]; valores: number[] }> = {};
   for (const d of dividendos) {
@@ -49,7 +52,7 @@ export async function GET() {
     rawById[id].valores.push(toNumber(d.valorDividendo));
   }
 
-  // Build per-investment grouped payment events (one entry per payment month)
+  // Build grouped events per investmentId
   const byId: Record<string, { ticker: string; nome: string; events: { date: Date; total: number }[] }> = {};
   for (const [id, raw] of Object.entries(rawById)) {
     byId[id] = {
@@ -63,19 +66,30 @@ export async function GET() {
   const calendar: Record<string, Record<string, number>> = {};
   const proximos: Array<{ ticker: string; nome: string; data: string; total: number; status: "estimado" }> = [];
 
-  for (const [, data] of Object.entries(byId)) {
+  for (const [invId, data] of Object.entries(byId)) {
     const { ticker, nome, events } = data;
     if (events.length === 0) continue;
 
+    const inv = invById[invId];
+    const manualYield = inv ? toNumber(inv.dividendYieldManual) : 0;
+
     const eventDates = events.map((e) => e.date);
     const intervaloMs = Math.max(25 * 86400 * 1000, Math.min(380 * 86400 * 1000, medianInterval(eventDates)));
+    const pagsPerYear = (365 * 86400 * 1000) / intervaloMs;
 
-    // Average of last 4 payment events (each already summed per month)
-    const lastEvents = events.slice(-4);
-    const avgValor = lastEvents.reduce((s, e) => s + e.total, 0) / lastEvents.length;
+    let avgValor: number;
+    if (manualYield > 0 && inv) {
+      // Use manual yield to derive the per-payment amount
+      const portfolioValue = toNumber(inv.quantidade) * toNumber(inv.valorAtualUnidade);
+      const annualIncome = portfolioValue * manualYield / 100;
+      avgValor = annualIncome / pagsPerYear;
+    } else {
+      // Use average of last 4 historical payment events
+      const lastEvents = events.slice(-4);
+      avgValor = lastEvents.reduce((s, e) => s + e.total, 0) / lastEvents.length;
+    }
 
     const lastDate = events[events.length - 1].date;
-
     let next = new Date(lastDate.getTime() + intervaloMs);
     let iter = 0;
     while (next < mesFim && iter < 15) {
@@ -92,9 +106,7 @@ export async function GET() {
 
   proximos.sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
 
-  // Yield data per investment — always use pattern-based projection (not raw 12m sum)
-  // because: (1) XTB import may be partial, (2) multiple rows per payment event inflate the count
-
+  // Yield data per investment
   const yieldData = investimentos
     .filter((inv) => toNumber(inv.quantidade) > 0)
     .map((inv) => {
@@ -110,7 +122,6 @@ export async function GET() {
         annualIncome = portfolioValue * manualYield / 100;
         dividendYield = manualYield;
       } else if (group && group.events.length > 0) {
-        // Project annual income from payment pattern (robust against partial imports and multiple rows)
         const lastEvents = group.events.slice(-4);
         const avgPayment = lastEvents.reduce((s, e) => s + e.total, 0) / lastEvents.length;
         const eventDates = group.events.map((e) => e.date);
