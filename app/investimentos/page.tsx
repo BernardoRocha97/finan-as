@@ -27,6 +27,7 @@ function InvForm({ initial, onSave, onClose }: any) {
     quantidade: 0,
     precoMedioCompra: 0,
     valorAtualUnidade: 0,
+    dividendYieldManual: "",
     plataforma: "",
     notas: "",
     ...initial,
@@ -34,13 +35,18 @@ function InvForm({ initial, onSave, onClose }: any) {
     quantidade: Number(initial?.quantidade ?? 0),
     precoMedioCompra: Number(initial?.precoMedioCompra ?? 0),
     valorAtualUnidade: Number(initial?.valorAtualUnidade ?? 0),
+    dividendYieldManual: initial?.dividendYieldManual != null ? String(Number(initial.dividendYieldManual)) : "",
   });
   const [loading, setLoading] = useState(false);
   const save = async () => {
     setLoading(true);
     const method = initial?.id ? "PUT" : "POST";
     const url = initial?.id ? `/api/investimentos/${initial.id}` : "/api/investimentos";
-    await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+    const payload = {
+      ...form,
+      dividendYieldManual: form.dividendYieldManual !== "" ? parseFloat(form.dividendYieldManual) : null,
+    };
+    await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     setLoading(false); onSave();
   };
   return (
@@ -70,6 +76,16 @@ function InvForm({ initial, onSave, onClose }: any) {
         </div>
         <div className="space-y-1"><Label>Preço médio (€)</Label><MoneyInput value={form.precoMedioCompra} onChange={(v) => setForm({ ...form, precoMedioCompra: v })} /></div>
         <div className="space-y-1"><Label>Valor atual (€)</Label><MoneyInput value={form.valorAtualUnidade} onChange={(v) => setForm({ ...form, valorAtualUnidade: v })} /></div>
+      </div>
+      <div className="space-y-1">
+        <Label>Dividend Yield manual (%) <span className="text-muted-foreground text-xs font-normal">— deixa vazio para calcular automaticamente</span></Label>
+        <Input
+          type="number"
+          step="0.01"
+          placeholder="Ex: 7.50"
+          value={form.dividendYieldManual}
+          onChange={(e) => setForm({ ...form, dividendYieldManual: e.target.value })}
+        />
       </div>
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>Cancelar</Button>
@@ -207,17 +223,38 @@ function MovimentosInvestimentoPanel() {
 // ── Dividendos Panel ─────────────────────────────────────────────────────────
 
 const MESES_PT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+function buildNextMonths(n: number): string[] {
+  const today = new Date();
+  const result: string[] = [];
+  for (let i = 0; i < n; i++) {
+    const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
+    result.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  }
+  return result;
+}
+
+function mesLabel(key: string): string {
+  const [year, month] = key.split("-");
+  return `${MESES_ABREV[parseInt(month) - 1]}-${year.slice(2)}`;
+}
 
 function DividendosPanel({ investimentos }: { investimentos: any[] }) {
   const [allDivs, setAllDivs] = useState<any[]>([]);
+  const [calData, setCalData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [filtroTicker, setFiltroTicker] = useState<string>("todos");
 
   useEffect(() => {
-    fetch("/api/investimentos/dividendos")
-      .then((r) => r.json())
-      .then((d) => { setAllDivs(d.data ?? []); setLoading(false); })
-      .catch(() => setLoading(false));
+    Promise.all([
+      fetch("/api/investimentos/dividendos").then((r) => r.json()),
+      fetch("/api/investimentos/calendario").then((r) => r.json()),
+    ]).then(([divs, cal]) => {
+      setAllDivs(divs.data ?? []);
+      setCalData(cal.data ?? null);
+      setLoading(false);
+    }).catch(() => setLoading(false));
   }, []);
 
   const tickers = [...new Set(allDivs.map((o) => o.ticker))].sort();
@@ -293,10 +330,176 @@ function DividendosPanel({ investimentos }: { investimentos: any[] }) {
   // Crescimento YoY
   const crescimentoYoY = anoAnt > 0 ? ((esteAno - anoAnt) / anoAnt) * 100 : null;
 
+  const nextMonths = buildNextMonths(12);
+  const calendar = calData?.calendar ?? {};
+  const proximos = (calData?.proximos ?? []).slice(0, 30);
+  const yieldData: any[] = calData?.yieldData ?? [];
+
+  // tickers that appear in calendar
+  const calTickers = [...new Set([
+    ...Object.keys(calendar),
+    ...yieldData.map((y: any) => y.ticker),
+  ])].sort();
+
   if (loading) return <div className="flex items-center justify-center py-16 gap-2 text-muted-foreground"><RefreshCw className="h-4 w-4 animate-spin" />A carregar...</div>;
 
   return (
     <div className="space-y-6">
+
+      {/* ── Yield Table ── */}
+      {yieldData.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-base">Yield por ativo</CardTitle></CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-muted">
+                  <tr>
+                    <th className="text-left px-4 py-2.5 font-medium">Ticker</th>
+                    <th className="text-right px-4 py-2.5 font-medium text-amber-600">Dividend Yield</th>
+                    <th className="text-right px-4 py-2.5 font-medium text-blue-600">Yield on Cost</th>
+                    <th className="text-right px-4 py-2.5 font-medium text-emerald-600">Rendimento Anual</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {yieldData.sort((a: any, b: any) => b.annualIncome - a.annualIncome).map((y: any) => (
+                    <tr key={y.id} className="hover:bg-muted/30 transition-colors">
+                      <td className="px-4 py-2.5">
+                        <p className="font-semibold">{y.ticker}</p>
+                        <p className="text-xs text-muted-foreground">{y.nome}</p>
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <span className={cn("font-semibold", y.dividendYield >= 8 ? "text-emerald-500" : y.dividendYield >= 4 ? "text-amber-500" : "text-muted-foreground")}>
+                          {y.dividendYield > 0 ? `${y.dividendYield.toFixed(2)}%` : "—"}
+                        </span>
+                        {y.dividendYieldManual > 0 && <span className="block text-xs text-blue-500">manual</span>}
+                      </td>
+                      <td className="px-4 py-2.5 text-right font-semibold text-blue-600">
+                        {y.yieldOnCost > 0 ? `${y.yieldOnCost.toFixed(2)}%` : "—"}
+                      </td>
+                      <td className="px-4 py-2.5 text-right font-bold text-emerald-500">
+                        {y.annualIncome > 0 ? formatCurrency(y.annualIncome) : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="bg-muted/50 font-semibold">
+                    <td className="px-4 py-2.5">Total</td>
+                    <td className="px-4 py-2.5 text-right text-amber-600">
+                      {(() => {
+                        const totalV = yieldData.reduce((s: number, y: any) => s + y.portfolioValue, 0);
+                        const totalI = yieldData.reduce((s: number, y: any) => s + y.annualIncome, 0);
+                        return totalV > 0 ? `${((totalI / totalV) * 100).toFixed(2)}%` : "—";
+                      })()}
+                    </td>
+                    <td className="px-4 py-2.5 text-right text-blue-600">—</td>
+                    <td className="px-4 py-2.5 text-right text-emerald-500">
+                      {formatCurrency(yieldData.reduce((s: number, y: any) => s + y.annualIncome, 0))}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Payout Calendar (next 12 months) ── */}
+      {calTickers.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-base">Calendário de Pagamentos — próximos 12 meses</CardTitle></CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-muted">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-medium sticky left-0 bg-muted">Ticker</th>
+                    {nextMonths.map((m) => (
+                      <th key={m} className="text-center px-2 py-2 font-medium whitespace-nowrap">{mesLabel(m)}</th>
+                    ))}
+                    <th className="text-right px-3 py-2 font-medium">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {calTickers.filter((t) => calendar[t]).map((ticker) => {
+                    const rowTotal = nextMonths.reduce((s, m) => s + (calendar[ticker]?.[m] ?? 0), 0);
+                    if (rowTotal === 0) return null;
+                    return (
+                      <tr key={ticker} className="hover:bg-muted/30 transition-colors">
+                        <td className="px-3 py-2 font-semibold sticky left-0 bg-background">{ticker}</td>
+                        {nextMonths.map((m) => {
+                          const val = calendar[ticker]?.[m];
+                          return (
+                            <td key={m} className="text-center px-2 py-2">
+                              {val ? <span className="font-medium text-emerald-600">{formatCurrency(val)}</span> : <span className="text-muted-foreground/30">—</span>}
+                            </td>
+                          );
+                        })}
+                        <td className="px-3 py-2 text-right font-bold text-emerald-500">{formatCurrency(rowTotal)}</td>
+                      </tr>
+                    );
+                  })}
+                  <tr className="bg-muted/50 font-semibold">
+                    <td className="px-3 py-2 sticky left-0 bg-muted">Total</td>
+                    {nextMonths.map((m) => {
+                      const total = calTickers.reduce((s, t) => s + (calendar[t]?.[m] ?? 0), 0);
+                      return (
+                        <td key={m} className="text-center px-2 py-2 font-bold">
+                          {total > 0 ? <span className="text-emerald-600">{formatCurrency(total)}</span> : <span className="text-muted-foreground/30">—</span>}
+                        </td>
+                      );
+                    })}
+                    <td className="px-3 py-2 text-right text-emerald-500">
+                      {formatCurrency(calTickers.reduce((s, t) => s + nextMonths.reduce((ss, m) => ss + (calendar[t]?.[m] ?? 0), 0), 0))}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs text-muted-foreground px-4 py-2">* Valores estimados com base no histórico de dividendos</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Upcoming Dividends List ── */}
+      {proximos.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-base">Próximos dividendos estimados</CardTitle></CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-background border-b">
+                  <tr>
+                    <th className="text-left px-4 py-2.5 font-medium">Ticker</th>
+                    <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Nome</th>
+                    <th className="text-center px-4 py-2.5 font-medium">Estado</th>
+                    <th className="text-right px-4 py-2.5 font-medium">Data estimada</th>
+                    <th className="text-right px-4 py-2.5 font-medium">Valor</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {proximos.map((p: any, i: number) => (
+                    <tr key={i} className="hover:bg-muted/30 transition-colors">
+                      <td className="px-4 py-2.5 font-semibold">{p.ticker}</td>
+                      <td className="px-4 py-2.5 text-xs text-muted-foreground truncate max-w-[160px]">{p.nome}</td>
+                      <td className="px-4 py-2.5 text-center">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                          Estimado *
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-muted-foreground whitespace-nowrap">
+                        {new Date(p.data).toLocaleDateString("pt-PT", { day: "2-digit", month: "short", year: "numeric" })}
+                      </td>
+                      <td className="px-4 py-2.5 text-right font-bold text-emerald-500">{formatCurrency(p.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs text-muted-foreground px-4 py-2">* Datas e valores estimados com base no padrão histórico de pagamentos</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <Card><CardContent className="pt-4 pb-3">

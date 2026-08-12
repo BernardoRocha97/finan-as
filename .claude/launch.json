@@ -2,8 +2,8 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "financas",
-      "runtimeExecutable": "npm",
+      "name": "financas-dev",
+      "runtimeExecutable": "C:\\Program Files\\nodejs\\npm.cmd",
       "runtimeArgs": ["run", "dev"],
       "port": 3000,
       "cwd": "C:\\Users\\berna\\OneDrive\\Ambiente de Trabalho\\financas"

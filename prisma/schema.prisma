@@ -99,6 +99,7 @@ model Investment {
   valorAtualUnidade      Decimal  @default(0)
   plataforma             String?
   dividendYieldCalculado Decimal  @default(0)
+  dividendYieldManual    Decimal?
   notas                  String?
   ativa                  Boolean  @default(true)
   criadoEm              DateTime @default(now())

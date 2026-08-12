@@ -20,7 +20,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const body = await req.json();
   // Only pass known Investment fields to Prisma (ignore valorTotal, custo, ganhoPerda, etc.)
-  const { nome, ticker, tipo, quantidade, precoMedioCompra, valorAtualUnidade, plataforma, notas, ativa } = body;
+  const { nome, ticker, tipo, quantidade, precoMedioCompra, valorAtualUnidade, plataforma, notas, ativa, dividendYieldManual } = body;
   const data: any = {};
   if (nome !== undefined) data.nome = nome;
   if (ticker !== undefined) data.ticker = ticker;
@@ -31,6 +31,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (plataforma !== undefined) data.plataforma = plataforma;
   if (notas !== undefined) data.notas = notas;
   if (ativa !== undefined) data.ativa = ativa;
+  if (dividendYieldManual !== undefined) data.dividendYieldManual = dividendYieldManual === null ? null : Number(dividendYieldManual);
   const inv = await prisma.investment.update({ where: { id }, data });
   return NextResponse.json({ data: inv });
 }
