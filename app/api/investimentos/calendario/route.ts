@@ -76,26 +76,32 @@ export async function GET() {
       const portfolioValue = toNumber(inv.quantidade) * toNumber(inv.valorAtualUnidade);
       const costBasis = toNumber(inv.quantidade) * toNumber(inv.precoMedioCompra);
 
-      // Annual income from last 12m history
-      let annualIncome = dividendos
-        .filter((d) => d.investmentId === inv.id && new Date(d.data) >= ha12Meses)
-        .reduce((s, d) => s + toNumber(d.valorDividendo), 0);
-
-      // If no recent dividends, project from pattern
-      if (annualIncome === 0 && divGroup) {
-        const avgV = divGroup.valores.slice(-4).reduce((s, v) => s + v, 0) / Math.min(4, divGroup.valores.length);
-        const intervalMs = medianInterval(divGroup.datas);
-        const pagsPerYear = (365 * 86400 * 1000) / Math.max(1, intervalMs);
-        annualIncome = avgV * pagsPerYear;
-      }
-
-      // If still 0 and manual yield set, derive from yield
       const manualYield = toNumber(inv.dividendYieldManual);
-      if (annualIncome === 0 && manualYield > 0) {
+
+      let annualIncome: number;
+      let dividendYield: number;
+
+      if (manualYield > 0) {
+        // Manual yield overrides everything
         annualIncome = portfolioValue * manualYield / 100;
+        dividendYield = manualYield;
+      } else {
+        // Annual income from last 12m history
+        annualIncome = dividendos
+          .filter((d) => d.investmentId === inv.id && new Date(d.data) >= ha12Meses)
+          .reduce((s, d) => s + toNumber(d.valorDividendo), 0);
+
+        // If no recent dividends, project from pattern
+        if (annualIncome === 0 && divGroup) {
+          const avgV = divGroup.valores.slice(-4).reduce((s, v) => s + v, 0) / Math.min(4, divGroup.valores.length);
+          const intervalMs = medianInterval(divGroup.datas);
+          const pagsPerYear = (365 * 86400 * 1000) / Math.max(1, intervalMs);
+          annualIncome = avgV * pagsPerYear;
+        }
+
+        dividendYield = portfolioValue > 0 ? (annualIncome / portfolioValue) * 100 : 0;
       }
 
-      const dividendYield = portfolioValue > 0 ? (annualIncome / portfolioValue) * 100 : manualYield;
       const yieldOnCost = costBasis > 0 ? (annualIncome / costBasis) * 100 : 0;
 
       return {
