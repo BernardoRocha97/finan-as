@@ -1309,11 +1309,13 @@ export default function InvestimentosPage() {
       )}
 
       {resumo && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
           <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Valor total</p><p className="text-2xl font-bold">{formatCurrency(resumo.valorTotal)}</p></CardContent></Card>
           <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Custo total</p><p className="text-2xl font-bold">{formatCurrency(resumo.custoTotal)}</p></CardContent></Card>
-          <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Ganho/Perda</p><p className={cn("text-2xl font-bold", resumo.ganhoPerda >= 0 ? "text-green-600" : "text-red-500")}>{formatCurrency(resumo.ganhoPerda)}</p></CardContent></Card>
-          <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Rentabilidade</p><p className={cn("text-2xl font-bold", resumo.ganhoPerdaPercent >= 0 ? "text-green-600" : "text-red-500")}>{resumo.ganhoPerdaPercent.toFixed(2)}%</p></CardContent></Card>
+          <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Ganho/Perda preço</p><p className={cn("text-2xl font-bold", resumo.ganhoPerda >= 0 ? "text-green-600" : "text-red-500")}>{formatCurrency(resumo.ganhoPerda)}</p><p className="text-xs text-muted-foreground mt-1">{resumo.ganhoPerdaPercent.toFixed(2)}%</p></CardContent></Card>
+          <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Dividendos recebidos</p><p className="text-2xl font-bold text-emerald-500">{formatCurrency(resumo.totalDividendos)}</p><p className="text-xs text-muted-foreground mt-1">total histórico</p></CardContent></Card>
+          <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Rentabilidade/ano</p><p className={cn("text-2xl font-bold", resumo.totalReturnAnualizado >= 0 ? "text-green-600" : "text-red-500")}>{resumo.totalReturnAnualizado.toFixed(2)}%<span className="text-sm font-normal">/ano</span></p><p className="text-xs text-muted-foreground mt-1">CAGR · {resumo.anosInvestido}a investido</p></CardContent></Card>
+          <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Rentabilidade total</p><p className={cn("text-2xl font-bold", resumo.totalReturnPercent >= 0 ? "text-green-600" : "text-red-500")}>{resumo.totalReturnPercent.toFixed(2)}%</p><p className="text-xs text-muted-foreground mt-1">desde início</p></CardContent></Card>
         </div>
       )}
 
