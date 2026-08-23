@@ -10,6 +10,7 @@ import { Upload, CheckCircle, AlertCircle, AlertTriangle, HelpCircle, RotateCcw 
 
 const BANCOS = [
   { value: "santander", label: "Santander", hint: "santander" },
+  { value: "revolut", label: "Revolut", hint: "revolut" },
   { value: "cgd", label: "Caixa Geral de Depósitos", hint: "caixa" },
   { value: "bpi", label: "BPI", hint: "bpi" },
   { value: "millennium", label: "Millennium BCP", hint: "millennium" },

@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { parseBPI, parseCGD, parseMillennium, parseGenericCSV } from "@/lib/parsers";
+import { parseBPI, parseCGD, parseMillennium, parseGenericCSV, parseRevolut } from "@/lib/parsers";
 import { parseCGDXLS } from "@/lib/parsers/cgdXls";
 import { categorizeTransaction } from "@/lib/categories";
 import { toNumber } from "@/lib/utils";
@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
       case "bpi": parsed = parseBPI(text); break;
       case "cgd": parsed = parseCGD(text); break;
       case "millennium": parsed = parseMillennium(text); break;
+      case "revolut": parsed = parseRevolut(text); break;
       default: parsed = parseGenericCSV(text);
     }
   }

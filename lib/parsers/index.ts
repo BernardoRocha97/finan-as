@@ -24,3 +24,4 @@ export { parseBPI } from "./bpi";
 export { parseCGD } from "./cgd";
 export { parseMillennium } from "./millennium";
 export { parseGenericCSV } from "./generic";
+export { parseRevolut } from "./revolut";
