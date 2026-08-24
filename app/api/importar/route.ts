@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
       case "bpi": parsed = parseBPI(text); break;
       case "cgd": parsed = parseCGD(text); break;
       case "millennium": parsed = parseMillennium(text); break;
-      case "revolut": parsed = parseRevolut(text); break;
+      case "revolut": { const r = parseRevolut(text); parsed = r.transactions; saldoExtrato = r.saldoFinal; break; }
       default: parsed = parseGenericCSV(text);
     }
   }
