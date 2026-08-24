@@ -30,9 +30,8 @@ export function parseRevolut(text: string): ParsedTransaction[] {
       if (montante < 0) {
         return { data, descricao, valor: Math.abs(montante), tipo: "DESPESA" };
       } else {
-        // Positive: top-ups are transfers, everything else is income
-        const isTopUp = tipo.toLowerCase().includes("carregamento") || tipo.toLowerCase().includes("top-up");
-        return { data, descricao, valor: montante, tipo: isTopUp ? "RECEITA" : "RECEITA" };
+        const isTopUp = tipo.toLowerCase().includes("carregamento") || tipo.toLowerCase().includes("top-up") || tipo.toLowerCase().includes("topup");
+        return { data, descricao, valor: montante, tipo: isTopUp ? "TRANSFERENCIA" : "RECEITA" };
       }
     })
     .filter(Boolean) as ParsedTransaction[];

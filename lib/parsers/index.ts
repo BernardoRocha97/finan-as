@@ -2,7 +2,7 @@ export interface ParsedTransaction {
   data: Date;
   descricao: string;
   valor: number;
-  tipo: "DESPESA" | "RECEITA";
+  tipo: "DESPESA" | "RECEITA" | "TRANSFERENCIA";
   referencia?: string;
 }
 
