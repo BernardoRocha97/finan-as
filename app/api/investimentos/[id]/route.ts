@@ -96,12 +96,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         importada: false,
       },
     });
-    // Recalc account balance
-    const { toNumber: tn } = await import("@/lib/utils");
-    const transacoes = await prisma.transaction.findMany({ where: { accountId: parsed.data.accountId, tipo: { not: "TRANSFERENCIA" } } });
-    const saldo = transacoes.reduce((s, t) => (t.tipo === "RECEITA" ? s + tn(t.valor) : s - tn(t.valor)), 0);
-    await prisma.account.update({ where: { id: parsed.data.accountId }, data: { saldo } });
-
     await updateDividendYield(id);
   }
 

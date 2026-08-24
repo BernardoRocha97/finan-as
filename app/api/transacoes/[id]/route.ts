@@ -50,15 +50,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     data: { ...rest, ...(d ? { data: new Date(d) } : {}) },
   });
 
-  await recalcSaldo(t.accountId);
-  if (old?.accountId && old.accountId !== t.accountId) await recalcSaldo(old.accountId);
-
   return NextResponse.json({ data: t });
 }
 
 export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const t = await prisma.transaction.delete({ where: { id } });
-  await recalcSaldo(t.accountId);
+  await prisma.transaction.delete({ where: { id } });
   return NextResponse.json({ data: { ok: true } });
 }

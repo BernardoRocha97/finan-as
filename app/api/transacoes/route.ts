@@ -87,9 +87,6 @@ export async function POST(req: NextRequest) {
     data: { ...rest, data: new Date(d) },
   });
 
-  await recalcSaldo(transacao.accountId);
-  if (transacao.accountDestId) await recalcSaldo(transacao.accountDestId);
-
   return NextResponse.json({ data: transacao }, { status: 201 });
 }
 
