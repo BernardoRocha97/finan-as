@@ -153,6 +153,7 @@ function InlineCategoryPicker({ transacao, categorias, onSaved }: { transacao: a
   };
 
   const isInvestimento = transacao.tipo === "INVESTIMENTO";
+  const isTransferencia = transacao.tipo === "TRANSFERENCIA";
   const hasCategory = transacao.category && transacao.category.id !== "Outros";
 
   return (
@@ -165,6 +166,15 @@ function InlineCategoryPicker({ transacao, categorias, onSaved }: { transacao: a
           className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded px-2 py-0.5 hover:opacity-70 transition-opacity"
         >
           📈 Investimento
+        </button>
+      ) : isTransferencia ? (
+        <button
+          ref={btnRef}
+          onClick={() => setOpen(!open)}
+          title="Clica para mudar"
+          className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground bg-muted border border-muted-foreground/20 rounded px-2 py-0.5 hover:opacity-70 transition-opacity"
+        >
+          ↔ Transferência
         </button>
       ) : hasCategory ? (
         <button
@@ -188,7 +198,7 @@ function InlineCategoryPicker({ transacao, categorias, onSaved }: { transacao: a
       )}
       {open && (
         <div className={`absolute left-0 z-50 bg-popover border rounded-lg shadow-lg p-1 min-w-[200px] max-h-72 overflow-y-auto ${dropUp ? "bottom-full mb-1" : "top-full mt-1"}`}>
-          {!isInvestimento && (
+          {!isInvestimento && !isTransferencia && (
             <>
               <button
                 onClick={marcarInvestimento}
@@ -205,6 +215,22 @@ function InlineCategoryPicker({ transacao, categorias, onSaved }: { transacao: a
               >
                 <span className="text-base">↔️</span>
                 Marcar como Transferência
+              </button>
+              <div className="border-t my-1" />
+            </>
+          )}
+          {isTransferencia && (
+            <>
+              <button
+                onClick={async () => {
+                  setSaving(true);
+                  await fetch(`/api/transacoes/${transacao.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipo: "DESPESA", revisada: true }) });
+                  setSaving(false); setOpen(false); onSaved();
+                }}
+                disabled={saving}
+                className="w-full text-left px-3 py-1.5 text-sm rounded hover:bg-muted flex items-center gap-2 text-muted-foreground"
+              >
+                ↩ Reverter para Despesa
               </button>
               <div className="border-t my-1" />
             </>
