@@ -128,6 +128,18 @@ function InlineCategoryPicker({ transacao, categorias, onSaved }: { transacao: a
     onSaved();
   };
 
+  const marcarTransferencia = async () => {
+    setSaving(true);
+    await fetch(`/api/transacoes/${transacao.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tipo: "TRANSFERENCIA", revisada: true }),
+    });
+    setSaving(false);
+    setOpen(false);
+    onSaved();
+  };
+
   const marcarInvestimento = async () => {
     setSaving(true);
     await fetch(`/api/transacoes/${transacao.id}`, {
@@ -185,6 +197,14 @@ function InlineCategoryPicker({ transacao, categorias, onSaved }: { transacao: a
               >
                 <span className="text-base">📈</span>
                 Marcar como Investimento
+              </button>
+              <button
+                onClick={marcarTransferencia}
+                disabled={saving}
+                className="w-full text-left px-3 py-1.5 text-sm rounded hover:bg-muted flex items-center gap-2 text-muted-foreground font-medium"
+              >
+                <span className="text-base">↔️</span>
+                Marcar como Transferência
               </button>
               <div className="border-t my-1" />
             </>
