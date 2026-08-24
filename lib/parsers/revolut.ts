@@ -33,8 +33,10 @@ export function parseRevolut(text: string): { transactions: ParsedTransaction[];
       if (montante < 0) {
         return { data, descricao, valor: Math.abs(montante), tipo: "DESPESA" };
       } else {
+        // Skip top-ups entirely — they are transfers from another account and would corrupt the balance
         const isTopUp = tipo.toLowerCase().includes("carregamento") || tipo.toLowerCase().includes("top-up") || tipo.toLowerCase().includes("topup");
-        return { data, descricao, valor: montante, tipo: isTopUp ? "TRANSFERENCIA" : "RECEITA" };
+        if (isTopUp) return null;
+        return { data, descricao, valor: montante, tipo: "RECEITA" };
       }
     })
     .filter(Boolean) as ParsedTransaction[];
