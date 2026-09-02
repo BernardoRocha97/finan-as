@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { cn, formatCurrency } from "@/lib/utils";
 import {
   LayoutDashboard, Landmark, TrendingUp, Home, ArrowLeftRight,
-  Upload, Target, BarChart3, Settings, Sun, Moon, CalendarRange, Wallet,
+  Upload, Target, BarChart3, Settings, Sun, Moon, CalendarRange, Wallet, Calculator,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -21,6 +21,7 @@ const nav = [
   { href: "/orcamento", label: "Orçamento", icon: Wallet },
   { href: "/objetivos", label: "Objetivos", icon: Target },
   { href: "/relatorios", label: "Relatórios", icon: BarChart3 },
+  { href: "/simulador", label: "Simulador", icon: Calculator },
   { href: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 

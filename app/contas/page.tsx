@@ -166,7 +166,7 @@ export default function ContasPage() {
                   const anual = dividendosAnuais;
                   const mensal = anual / 12;
                   const diario = anual / 365;
-                  const retencao = 0.28;
+                  const retencao = 0.30;
                   const anualLiq = anual * (1 - retencao);
                   const mensalLiq = anualLiq / 12;
                   const diarioLiq = anualLiq / 365;
@@ -179,7 +179,7 @@ export default function ContasPage() {
                         <div><span className="text-muted-foreground">Dia</span><br /><span className="font-semibold text-green-600">{formatCurrency(diario)}</span></div>
                       </div>
                       <div className="grid grid-cols-3 gap-1 text-xs pt-1 border-t border-dashed">
-                        <div className="col-span-3 mb-0.5"><span className="text-muted-foreground">Líquido após 28% retenção</span></div>
+                        <div className="col-span-3 mb-0.5"><span className="text-muted-foreground">Líquido após 30% retenção</span></div>
                         <div><span className="font-semibold text-emerald-700 dark:text-emerald-400">{formatCurrency(anualLiq)}</span></div>
                         <div><span className="font-semibold text-emerald-700 dark:text-emerald-400">{formatCurrency(mensalLiq)}</span></div>
                         <div><span className="font-semibold text-emerald-700 dark:text-emerald-400">{formatCurrency(diarioLiq)}</span></div>
