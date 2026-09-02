@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { use } from "react";
 import { formatCurrency, formatDate, toNumber } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MoneyInput } from "@/components/ui/MoneyInput";
-import { ArrowLeft, Plus, RefreshCw, TrendingUp, Edit2 } from "lucide-react";
+import { ArrowLeft, Plus, RefreshCw, TrendingUp, Edit2, Calculator } from "lucide-react";
 import Link from "next/link";
 
 export default function ImovelDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -214,6 +214,9 @@ export default function ImovelDetailPage({ params }: { params: Promise<{ id: str
         </Card>
       )}
 
+      {/* Simulador de amortização */}
+      {imovel.hipoteca && <SimuladorAmortizacao hipoteca={imovel.hipoteca} />}
+
       {/* Edit imóvel dialog */}
       <Dialog open={openImovel} onOpenChange={setOpenImovel}>
         <DialogContent className="max-w-lg">
@@ -238,6 +241,187 @@ export default function ImovelDetailPage({ params }: { params: Promise<{ id: str
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function SimuladorAmortizacao({ hipoteca }: { hipoteca: any }) {
+  const capital = toNumber(hipoteca.capitalEmDivida);
+  const prestacaoAtual = toNumber(hipoteca.prestacaoMensal);
+  const taxaAnual = toNumber(hipoteca.taxaJuro);
+  const tipoTaxa = hipoteca.tipoTaxa ?? "VARIAVEL_EURIBOR";
+
+  // meses restantes baseado em dataInicio + prazoAnos
+  const mesesRestantes = useMemo(() => {
+    const inicio = new Date(hipoteca.dataInicio);
+    const fim = new Date(inicio);
+    fim.setFullYear(fim.getFullYear() + (hipoteca.prazoAnos ?? 30));
+    const diff = (fim.getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30.44);
+    return Math.max(1, Math.round(diff));
+  }, [hipoteca.dataInicio, hipoteca.prazoAnos]);
+
+  const [valorAmortizar, setValorAmortizar] = useState(5000);
+  const [modo, setModo] = useState<"prestacao" | "prazo">("prestacao");
+
+  const r = taxaAnual / 100 / 12;
+
+  const resultado = useMemo(() => {
+    const novoCapital = Math.max(0, capital - valorAmortizar);
+    // comissão: variável 0.5%, fixa 2% (DL 74-A/2017)
+    const pctComissao = tipoTaxa === "FIXA" ? 0.02 : 0.005;
+    const comissao = valorAmortizar * pctComissao;
+
+    if (modo === "prestacao") {
+      // reduzir prestação — mesmo prazo, nova prestação
+      const novaPrestacao = r > 0
+        ? novoCapital * r / (1 - Math.pow(1 + r, -mesesRestantes))
+        : novoCapital / mesesRestantes;
+      const reducaoPrestacao = prestacaoAtual - novaPrestacao;
+      const poupancaTotalJuros =
+        (prestacaoAtual * mesesRestantes - capital) - (novaPrestacao * mesesRestantes - novoCapital);
+
+      return { novaPrestacao, reducaoPrestacao, novosPrazoMeses: mesesRestantes, mesesPoupadosMeses: 0, poupancaTotalJuros, comissao };
+    } else {
+      // reduzir prazo — mesma prestação, menos meses
+      const novosPrazoMeses = r > 0 && prestacaoAtual > novoCapital * r
+        ? Math.ceil(-Math.log(1 - novoCapital * r / prestacaoAtual) / Math.log(1 + r))
+        : mesesRestantes;
+      const mesesPoupados = mesesRestantes - novosPrazoMeses;
+      const poupancaTotalJuros =
+        (prestacaoAtual * mesesRestantes - capital) - (prestacaoAtual * novosPrazoMeses - novoCapital);
+
+      return { novaPrestacao: prestacaoAtual, reducaoPrestacao: 0, novosPrazoMeses, mesesPoupadosMeses: mesesPoupados, poupancaTotalJuros, comissao };
+    }
+  }, [capital, valorAmortizar, modo, r, mesesRestantes, prestacaoAtual, tipoTaxa]);
+
+  const anosRestantes = Math.floor(mesesRestantes / 12);
+  const mesesExtra = mesesRestantes % 12;
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center gap-2 pb-3">
+        <Calculator className="h-4 w-4 text-muted-foreground" />
+        <CardTitle className="text-base">Simulador de amortização antecipada</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Info legal */}
+        <div className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground space-y-0.5">
+          <p><span className="font-medium">Regras Santander / Portugal (DL 74-A/2017):</span></p>
+          <p>• Taxa variável (Euribor): comissão de <span className="font-medium">0,5%</span> do valor amortizado</p>
+          <p>• Taxa fixa: comissão de <span className="font-medium">2%</span> do valor amortizado</p>
+          <p>• A comissão foi suspensa para taxa variável de 2022 a dez. 2024 — em 2025 voltou a aplicar-se.</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Inputs */}
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Valor a amortizar (€)</Label>
+              <Input type="number" step="500" min="0" max={capital}
+                value={valorAmortizar}
+                onChange={(e) => setValorAmortizar(Math.min(capital, Math.max(0, Number(e.target.value))))}
+                className="h-8 text-sm" />
+              <p className="text-[10px] text-muted-foreground">Capital em dívida: {formatCurrency(capital)}</p>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Objetivo da amortização</Label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setModo("prestacao")}
+                  className={`flex-1 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${modo === "prestacao" ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted"}`}
+                >
+                  Reduzir prestação
+                </button>
+                <button
+                  onClick={() => setModo("prazo")}
+                  className={`flex-1 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${modo === "prazo" ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted"}`}
+                >
+                  Reduzir prazo
+                </button>
+              </div>
+            </div>
+            <div className="text-xs text-muted-foreground space-y-0.5 pt-1 border-t">
+              <p>Prazo restante: <span className="font-medium text-foreground">{anosRestantes}a {mesesExtra}m</span></p>
+              <p>Prestação atual: <span className="font-medium text-foreground">{formatCurrency(prestacaoAtual)}</span></p>
+              <p>Taxa: <span className="font-medium text-foreground">{taxaAnual}% ({tipoTaxa === "FIXA" ? "fixa" : "variável"})</span></p>
+            </div>
+          </div>
+
+          {/* Resultado imediato */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">Após amortização</p>
+            <div className="rounded-lg border p-3 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Novo capital</span>
+                <span className="font-semibold">{formatCurrency(Math.max(0, capital - valorAmortizar))}</span>
+              </div>
+              {modo === "prestacao" ? (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Nova prestação</span>
+                    <span className="font-semibold text-green-600">{formatCurrency(resultado.novaPrestacao)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Redução mensal</span>
+                    <span className="font-semibold text-green-600">-{formatCurrency(resultado.reducaoPrestacao)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Prazo</span>
+                    <span>inalterado ({anosRestantes}a {mesesExtra}m)</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Novo prazo</span>
+                    <span className="font-semibold text-green-600">
+                      {Math.floor(resultado.novosPrazoMeses / 12)}a {resultado.novosPrazoMeses % 12}m
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Meses poupados</span>
+                    <span className="font-semibold text-green-600">{resultado.mesesPoupadosMeses} meses</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Prestação</span>
+                    <span>inalterada ({formatCurrency(prestacaoAtual)})</span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Poupança total */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">Impacto total</p>
+            <div className="rounded-lg border p-3 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Comissão bancária</span>
+                <span className="font-semibold text-red-500">{formatCurrency(resultado.comissao)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Custo total amortização</span>
+                <span className="font-semibold">{formatCurrency(valorAmortizar + resultado.comissao)}</span>
+              </div>
+              <div className="flex justify-between text-sm border-t pt-2">
+                <span className="text-muted-foreground">Poupança em juros</span>
+                <span className="font-semibold text-green-600">{formatCurrency(Math.max(0, resultado.poupancaTotalJuros))}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Retorno líquido</span>
+                <span className={`font-semibold ${resultado.poupancaTotalJuros - resultado.comissao > 0 ? "text-green-600" : "text-red-500"}`}>
+                  {formatCurrency(Math.max(0, resultado.poupancaTotalJuros) - resultado.comissao)}
+                </span>
+              </div>
+              {modo === "prestacao" && resultado.reducaoPrestacao > 0 && (
+                <div className="text-[10px] text-muted-foreground border-t pt-1">
+                  Recuperas o valor amortizado em {Math.ceil(valorAmortizar / resultado.reducaoPrestacao)} meses de poupança na prestação
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
