@@ -105,8 +105,12 @@ export default function ContasPage() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [dividendosAnuais, setDividendosAnuais] = useState<number>(0);
 
-  const load = () => fetch("/api/contas").then((r) => r.json()).then((d) => setContas(d.data ?? []));
+  const load = () => {
+    fetch("/api/contas").then((r) => r.json()).then((d) => setContas(d.data ?? []));
+    fetch("/api/investimentos/resumo").then((r) => r.json()).then((d) => setDividendosAnuais(d.data?.dividendosAnuaisEsperados ?? 0));
+  };
 
   useEffect(() => { load(); }, []);
 
@@ -153,19 +157,54 @@ export default function ContasPage() {
                 <p className={`text-2xl font-bold ${toNumber(c.saldo) >= 0 ? "text-green-600" : "text-red-500"}`}>
                   {formatCurrency(toNumber(c.saldo))}
                 </p>
+                {c.tipo === "INVESTIMENTO" && dividendosAnuais > 0 && (() => {
+                  const anual = dividendosAnuais;
+                  const mensal = anual / 12;
+                  const diario = anual / 365;
+                  const retencao = 0.28;
+                  const anualLiq = anual * (1 - retencao);
+                  const mensalLiq = anualLiq / 12;
+                  const diarioLiq = anualLiq / 365;
+                  return (
+                    <div className="mt-2 pt-2 border-t border-dashed space-y-1.5">
+                      <p className="text-xs text-muted-foreground font-medium">Dividendos esperados/ano</p>
+                      <div className="grid grid-cols-3 gap-1 text-xs">
+                        <div><span className="text-muted-foreground">Ano</span><br /><span className="font-semibold text-green-600">{formatCurrency(anual)}</span></div>
+                        <div><span className="text-muted-foreground">Mês</span><br /><span className="font-semibold text-green-600">{formatCurrency(mensal)}</span></div>
+                        <div><span className="text-muted-foreground">Dia</span><br /><span className="font-semibold text-green-600">{formatCurrency(diario)}</span></div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1 text-xs pt-1 border-t border-dashed">
+                        <div className="col-span-3 mb-0.5"><span className="text-muted-foreground">Líquido após 28% retenção</span></div>
+                        <div><span className="font-semibold text-emerald-700 dark:text-emerald-400">{formatCurrency(anualLiq)}</span></div>
+                        <div><span className="font-semibold text-emerald-700 dark:text-emerald-400">{formatCurrency(mensalLiq)}</span></div>
+                        <div><span className="font-semibold text-emerald-700 dark:text-emerald-400">{formatCurrency(diarioLiq)}</span></div>
+                      </div>
+                    </div>
+                  );
+                })()}
                 {c.taxaJuroPoupanca && toNumber(c.saldo) > 0 && (() => {
                   const taxa = toNumber(c.taxaJuroPoupanca) / 100;
                   const saldo = toNumber(c.saldo);
                   const anual = saldo * taxa;
                   const mensal = anual / 12;
                   const diario = anual / 365;
+                  const retencao = 0.28;
+                  const anualLiq = anual * (1 - retencao);
+                  const mensalLiq = anualLiq / 12;
+                  const diarioLiq = anualLiq / 365;
                   return (
-                    <div className="mt-2 pt-2 border-t border-dashed space-y-0.5">
+                    <div className="mt-2 pt-2 border-t border-dashed space-y-1.5">
                       <p className="text-xs text-muted-foreground font-medium">Rendimento @ {toNumber(c.taxaJuroPoupanca)}%/ano</p>
                       <div className="grid grid-cols-3 gap-1 text-xs">
                         <div><span className="text-muted-foreground">Ano</span><br /><span className="font-semibold text-green-600">{formatCurrency(anual)}</span></div>
                         <div><span className="text-muted-foreground">Mês</span><br /><span className="font-semibold text-green-600">{formatCurrency(mensal)}</span></div>
                         <div><span className="text-muted-foreground">Dia</span><br /><span className="font-semibold text-green-600">{formatCurrency(diario)}</span></div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1 text-xs pt-1 border-t border-dashed">
+                        <div className="col-span-3 mb-0.5"><span className="text-muted-foreground">Líquido após 28% retenção</span></div>
+                        <div><span className="font-semibold text-emerald-700 dark:text-emerald-400">{formatCurrency(anualLiq)}</span></div>
+                        <div><span className="font-semibold text-emerald-700 dark:text-emerald-400">{formatCurrency(mensalLiq)}</span></div>
+                        <div><span className="font-semibold text-emerald-700 dark:text-emerald-400">{formatCurrency(diarioLiq)}</span></div>
                       </div>
                     </div>
                   );

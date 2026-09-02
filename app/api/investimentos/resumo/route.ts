@@ -11,6 +11,7 @@ export async function GET() {
 
   let valorTotal = 0;
   let custoTotal = 0;
+  let dividendosAnuaisEsperados = 0;
   const porTipo: Record<string, number> = {};
 
   for (const i of investimentos) {
@@ -19,6 +20,8 @@ export async function GET() {
     valorTotal += vt;
     custoTotal += ct;
     porTipo[i.tipo] = (porTipo[i.tipo] ?? 0) + vt;
+    const yield_ = i.dividendYieldManual != null ? toNumber(i.dividendYieldManual) : toNumber(i.dividendYieldCalculado);
+    dividendosAnuaisEsperados += vt * (yield_ / 100);
   }
 
   const totalDividendos = transacoes
@@ -56,6 +59,7 @@ export async function GET() {
       totalReturnPercent,
       totalReturnAnualizado,
       anosInvestido: Math.round(anosInvestido * 10) / 10,
+      dividendosAnuaisEsperados,
       porTipo,
     },
   });
