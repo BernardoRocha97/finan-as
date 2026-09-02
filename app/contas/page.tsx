@@ -106,10 +106,14 @@ export default function ContasPage() {
   const [editing, setEditing] = useState<any>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [dividendosAnuais, setDividendosAnuais] = useState<number>(0);
+  const [portfolioTotal, setPortfolioTotal] = useState<number>(0);
 
   const load = () => {
     fetch("/api/contas").then((r) => r.json()).then((d) => setContas(d.data ?? []));
-    fetch("/api/investimentos/resumo").then((r) => r.json()).then((d) => setDividendosAnuais(d.data?.dividendosAnuaisEsperados ?? 0));
+    fetch("/api/investimentos/resumo").then((r) => r.json()).then((d) => {
+      setDividendosAnuais(d.data?.dividendosAnuaisEsperados ?? 0);
+      setPortfolioTotal(d.data?.valorTotal ?? 0);
+    });
   };
 
   useEffect(() => { load(); }, []);
@@ -154,9 +158,10 @@ export default function ContasPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <p className={`text-2xl font-bold ${toNumber(c.saldo) >= 0 ? "text-green-600" : "text-red-500"}`}>
-                  {formatCurrency(toNumber(c.saldo))}
-                </p>
+                {c.tipo === "INVESTIMENTO" && portfolioTotal > 0
+                  ? <p className="text-2xl font-bold text-green-600">{formatCurrency(portfolioTotal)}</p>
+                  : <p className={`text-2xl font-bold ${toNumber(c.saldo) >= 0 ? "text-green-600" : "text-red-500"}`}>{formatCurrency(toNumber(c.saldo))}</p>
+                }
                 {c.tipo === "INVESTIMENTO" && dividendosAnuais > 0 && (() => {
                   const anual = dividendosAnuais;
                   const mensal = anual / 12;
