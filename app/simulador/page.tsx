@@ -538,23 +538,29 @@ export default function SimuladorPage() {
   const [dividendYieldMedio, setDividendYieldMedio] = useState(0);
   const [saldoPoupanca, setSaldoPoupanca] = useState(0);
   const [despesasMensais, setDespesasMensais] = useState(0);
-  const [netWorth, setNetWorth] = useState(0);
+  const [saldoContas, setSaldoContas] = useState(0);
 
   useEffect(() => {
-    fetch("/api/investimentos/resumo").then((r) => r.json()).then((d) => {
-      const data = d.data ?? {};
-      setPortfolioTotal(toNumber(data.valorTotal));
-      const y = data.valorTotal > 0 ? (data.dividendosAnuaisEsperados / data.valorTotal) * 100 : 0;
-      setDividendYieldMedio(Math.round(y * 100) / 100);
-    });
-
-    fetch("/api/contas").then((r) => r.json()).then((d) => {
+    // Carrega contas e investimentos em paralelo, soma no fim
+    const fetchContas = fetch("/api/contas").then((r) => r.json()).then((d) => {
       const contas = d.data ?? [];
       setSaldoPoupanca(contas.filter((c: any) => c.tipo === "POUPANCA").reduce((s: number, c: any) => s + toNumber(c.saldo), 0));
+      // soma saldos de contas não-investimento (corrente + poupança)
+      return contas.filter((c: any) => c.tipo !== "INVESTIMENTO").reduce((s: number, c: any) => s + toNumber(c.saldo), 0);
     });
 
-    fetch("/api/relatorios/patrimonio").then((r) => r.json()).then((d) => {
-      setNetWorth(toNumber(d.data?.netWorth ?? 0));
+    const fetchInv = fetch("/api/investimentos/resumo").then((r) => r.json()).then((d) => {
+      const data = d.data ?? {};
+      const pt = toNumber(data.valorTotal);
+      setPortfolioTotal(pt);
+      const y = pt > 0 ? (data.dividendosAnuaisEsperados / pt) * 100 : 0;
+      setDividendYieldMedio(Math.round(y * 100) / 100);
+      return pt;
+    });
+
+    Promise.all([fetchContas, fetchInv]).then(([saldoBancario, portfolio]) => {
+      // FIRE: saldo bancário (corrente + poupança) + portfólio de investimentos (sem imóvel)
+      setSaldoContas(saldoBancario + portfolio);
     });
 
     // despesas médias dos últimos 12 meses
@@ -590,7 +596,7 @@ export default function SimuladorPage() {
         </TabsContent>
 
         <TabsContent value="fire" className="mt-6">
-          <SimFIRE initialNetWorth={netWorth} initialDespesas={despesasMensais} initialPortfolio={portfolioTotal} />
+          <SimFIRE initialNetWorth={saldoContas} initialDespesas={despesasMensais} initialPortfolio={portfolioTotal} />
         </TabsContent>
       </Tabs>
     </div>
