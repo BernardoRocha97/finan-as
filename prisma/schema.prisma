@@ -14,7 +14,8 @@ model Account {
   banco        String
   iban         String?
   cor          String   @default("#3b82f6")
-  notas        String?
+  notas              String?
+  taxaJuroPoupanca   Decimal?
   ativa        Boolean  @default(true)
   criadoEm    DateTime @default(now())
   atualizadoEm DateTime @updatedAt

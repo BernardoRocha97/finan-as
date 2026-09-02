@@ -20,7 +20,7 @@ const TIPOS = [
 ];
 
 function ContaForm({ initial, onSave, onClose }: any) {
-  const [form, setForm] = useState({ nome: "", tipo: "CORRENTE", banco: "", saldo: 0, cor: "#3b82f6", iban: "", notas: "", ...initial });
+  const [form, setForm] = useState({ nome: "", tipo: "CORRENTE", banco: "", saldo: 0, cor: "#3b82f6", iban: "", notas: "", taxaJuroPoupanca: "", ...initial });
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
 
@@ -32,7 +32,7 @@ function ContaForm({ initial, onSave, onClose }: any) {
     const r = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, saldo: Number(form.saldo) }),
+      body: JSON.stringify({ ...form, saldo: Number(form.saldo), taxaJuroPoupanca: form.taxaJuroPoupanca !== "" && form.taxaJuroPoupanca !== null ? Number(form.taxaJuroPoupanca) : null }),
     });
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
@@ -77,6 +77,18 @@ function ContaForm({ initial, onSave, onClose }: any) {
           <input type="color" value={form.cor} onChange={(e) => setForm({ ...form, cor: e.target.value })} className="h-9 w-full rounded border cursor-pointer" />
         </div>
       </div>
+      {form.tipo === "POUPANCA" && (
+        <div className="space-y-1">
+          <Label>Taxa de juro anual (%)</Label>
+          <Input
+            type="number"
+            step="0.01"
+            placeholder="ex: 2.5"
+            value={form.taxaJuroPoupanca ?? ""}
+            onChange={(e) => setForm({ ...form, taxaJuroPoupanca: e.target.value })}
+          />
+        </div>
+      )}
       {erro && <p className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 rounded px-3 py-2">{erro}</p>}
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>Cancelar</Button>
@@ -141,6 +153,23 @@ export default function ContasPage() {
                 <p className={`text-2xl font-bold ${toNumber(c.saldo) >= 0 ? "text-green-600" : "text-red-500"}`}>
                   {formatCurrency(toNumber(c.saldo))}
                 </p>
+                {c.taxaJuroPoupanca && toNumber(c.saldo) > 0 && (() => {
+                  const taxa = toNumber(c.taxaJuroPoupanca) / 100;
+                  const saldo = toNumber(c.saldo);
+                  const anual = saldo * taxa;
+                  const mensal = anual / 12;
+                  const diario = anual / 365;
+                  return (
+                    <div className="mt-2 pt-2 border-t border-dashed space-y-0.5">
+                      <p className="text-xs text-muted-foreground font-medium">Rendimento @ {toNumber(c.taxaJuroPoupanca)}%/ano</p>
+                      <div className="grid grid-cols-3 gap-1 text-xs">
+                        <div><span className="text-muted-foreground">Ano</span><br /><span className="font-semibold text-green-600">{formatCurrency(anual)}</span></div>
+                        <div><span className="text-muted-foreground">Mês</span><br /><span className="font-semibold text-green-600">{formatCurrency(mensal)}</span></div>
+                        <div><span className="text-muted-foreground">Dia</span><br /><span className="font-semibold text-green-600">{formatCurrency(diario)}</span></div>
+                      </div>
+                    </div>
+                  );
+                })()}
                 {c.iban && <p className="text-xs text-muted-foreground mt-1">{c.iban}</p>}
               </CardContent>
             </Card>

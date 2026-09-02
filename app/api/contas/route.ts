@@ -11,6 +11,7 @@ const schema = z.object({
   iban: z.string().nullable().optional(),
   cor: z.string().default("#3b82f6"),
   notas: z.string().nullable().optional(),
+  taxaJuroPoupanca: z.number().nullable().optional(),
 });
 
 export async function GET() {

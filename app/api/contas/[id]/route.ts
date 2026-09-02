@@ -12,6 +12,7 @@ const schema = z.object({
   cor: z.string().optional(),
   notas: z.string().nullable().optional(),
   ativa: z.boolean().optional(),
+  taxaJuroPoupanca: z.number().nullable().optional(),
 });
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
