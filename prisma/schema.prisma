@@ -228,3 +228,154 @@ model Preference {
   fireMultiplicador        Decimal @default(25)
   contribuicaoMensalDefault Decimal @default(0)
 }
+
+// ─── V2 PORTFOLIO LEDGER ───────────────────────────────────────────────────
+
+model Instrument {
+  id                    String   @id @default(uuid())
+  isin                  String?  @unique
+  ticker                String
+  displayTicker         String
+  name                  String
+  issuer                String?
+  assetType             String   @default("STOCK")
+  subtype               String?
+  exchange              String?
+  currency              String   @default("USD")
+  country               String?
+  distributionType      String?
+  distributionFrequency String?
+  isActive              Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  portfolioTransactions PortfolioTransaction[]
+  lots                  Lot[]
+  incomeEvents          IncomeEvent[]
+  allocationTargets     AllocationTarget[]
+
+  @@map("instruments")
+}
+
+model PortfolioTransaction {
+  id              String      @id @default(uuid())
+  instrumentId    String?
+  instrument      Instrument? @relation(fields: [instrumentId], references: [id])
+  transactionType String
+  transactionDate DateTime
+  settlementDate  DateTime?
+  quantity        Decimal?
+  price           Decimal?
+  priceCurrency   String?
+  grossAmount     Decimal?
+  fees            Decimal     @default(0)
+  tax             Decimal     @default(0)
+  netAmount       Decimal?
+  fxRate          Decimal?
+  amountEur       Decimal?
+  externalId      String?     @unique
+  broker          String?
+  sourceFile      String?
+  positionId      String?
+  comment         String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  lots           Lot[]
+  lotAllocations LotAllocation[]
+
+  @@map("portfolio_transactions")
+}
+
+model Lot {
+  id                  String               @id @default(uuid())
+  instrumentId        String
+  instrument          Instrument           @relation(fields: [instrumentId], references: [id])
+  originTransactionId String
+  originTransaction   PortfolioTransaction @relation(fields: [originTransactionId], references: [id])
+  purchaseDate        DateTime
+  originalQuantity    Decimal
+  remainingQuantity   Decimal
+  unitCost            Decimal
+  totalCost           Decimal
+  currency            String
+  fxRate              Decimal?
+  costEur             Decimal?
+  status              String               @default("OPEN")
+  createdAt           DateTime             @default(now())
+
+  allocations LotAllocation[]
+
+  @@map("lots")
+}
+
+model LotAllocation {
+  id                String               @id @default(uuid())
+  sellTransactionId String
+  sellTransaction   PortfolioTransaction @relation(fields: [sellTransactionId], references: [id])
+  lotId             String
+  lot               Lot                  @relation(fields: [lotId], references: [id])
+  quantityAllocated Decimal
+  allocatedCost     Decimal
+  realizedPnl       Decimal
+  createdAt         DateTime             @default(now())
+
+  @@map("lot_allocations")
+}
+
+model IncomeEvent {
+  id             String      @id @default(uuid())
+  instrumentId   String?
+  instrument     Instrument? @relation(fields: [instrumentId], references: [id])
+  eventType      String
+  exDate         DateTime?
+  recordDate     DateTime?
+  paymentDate    DateTime?
+  declaredDate   DateTime?
+  grossAmount    Decimal?
+  withholdingTax Decimal?
+  otherTax       Decimal?
+  netAmount      Decimal?
+  currency       String?
+  fxRate         Decimal?
+  grossEur       Decimal?
+  taxEur         Decimal?
+  netEur         Decimal?
+  status         String      @default("PAID")
+  source         String?
+  confidence     String?
+  externalId     String?     @unique
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@map("income_events")
+}
+
+model AllocationTarget {
+  id           String     @id @default(uuid())
+  instrumentId String
+  instrument   Instrument @relation(fields: [instrumentId], references: [id])
+  targetWeight Decimal
+  minWeight    Decimal?
+  maxWeight    Decimal?
+  priority     Int        @default(0)
+  status       String     @default("ACTIVE")
+  notes        String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@map("allocation_targets")
+}
+
+model PortfolioSnapshot {
+  id             String   @id @default(uuid())
+  timestamp      DateTime @unique
+  cash           Decimal
+  marketValue    Decimal
+  portfolioValue Decimal
+  openPnl        Decimal?
+  source         String?
+  createdAt      DateTime @default(now())
+
+  @@map("portfolio_snapshots")
+}
