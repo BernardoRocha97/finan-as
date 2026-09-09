@@ -50,8 +50,11 @@ function KpiCard({ label, value, sub, color }: { label: string; value: string; s
 function PortfolioTab() {
   const [pos, setPos] = useState<any>(null);
   const [cash, setCash] = useState<any>(null);
+  const [livePrices, setLivePrices] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingPrices, setLoadingPrices] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [pricesAt, setPricesAt] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -66,17 +69,40 @@ function PortfolioTab() {
     }).catch((e) => setErr(e.message)).finally(() => setLoading(false));
   }, []);
 
+  const fetchLivePrices = async () => {
+    setLoadingPrices(true);
+    try {
+      const r = await fetch("/api/portfolio/prices");
+      const d = await r.json();
+      if (!d.error) { setLivePrices(d.data.prices); setPricesAt(d.data.fetchedAt); }
+    } finally { setLoadingPrices(false); }
+  };
+
   useEffect(() => { load(); }, [load]);
 
   if (loading) return <LoadingState />;
   if (err) return <ErrorState msg={err} onRetry={load} />;
   if (!pos) return null;
 
-  const { positions, summary } = pos;
-  const cashBal = cash?.cashBalance ?? 0;
-  const totalPortfolio = summary.totalMarketValue + cashBal;
+  // Merge live prices into positions
+  const positions = pos.positions.map((p: any) => {
+    const live = livePrices?.[p.instrumentId];
+    if (!live?.priceEur) return p;
+    const liveMarketValue = Math.round(p.quantity * live.priceEur * 100) / 100;
+    const liveUnrealizedPnl = Math.round((liveMarketValue - p.openCostEur) * 100) / 100;
+    const liveUnrealizedPnlPct = p.openCostEur > 0 ? Math.round((liveUnrealizedPnl / p.openCostEur) * 10000) / 100 : 0;
+    return { ...p, marketValueEur: liveMarketValue, unrealizedPnl: liveUnrealizedPnl, unrealizedPnlPct: liveUnrealizedPnlPct, livePrice: live.priceEur };
+  });
 
-  // Pie data by asset type
+  const liveMarketTotal = positions.reduce((s: number, p: any) => s + p.marketValueEur, 0);
+  const liveOpenCost = positions.reduce((s: number, p: any) => s + p.openCostEur, 0);
+  const liveUnrealizedPnl = liveMarketTotal - liveOpenCost;
+  const liveUnrealizedPnlPct = liveOpenCost > 0 ? (liveUnrealizedPnl / liveOpenCost) * 100 : 0;
+
+  const cashBal = cash?.cashBalance ?? 0;
+  const totalPortfolio = liveMarketTotal + cashBal;
+
+  // Pie data by asset type using live values
   const byType: Record<string, number> = {};
   for (const p of positions) {
     const t = p.subtype ?? p.assetType;
@@ -89,26 +115,37 @@ function PortfolioTab() {
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <KpiCard label="Carteira total" value={formatCurrency(totalPortfolio)} />
-        <KpiCard label="Posições" value={formatCurrency(summary.totalMarketValue)}
+        <KpiCard label="Posições" value={formatCurrency(liveMarketTotal)}
           sub={`${positions.length} ativos`} />
         <KpiCard label="Cash XTB" value={formatCurrency(cashBal)} color="text-blue-500" />
         <KpiCard
           label="P/L não realizado"
-          value={`${sign(summary.totalUnrealizedPnl)}${formatCurrency(summary.totalUnrealizedPnl)}`}
-          sub={`${sign(summary.totalUnrealizedPnlPct)}${summary.totalUnrealizedPnlPct.toFixed(2)}%`}
-          color={summary.totalUnrealizedPnl >= 0 ? "text-emerald-500" : "text-red-500"}
+          value={`${sign(liveUnrealizedPnl)}${formatCurrency(liveUnrealizedPnl)}`}
+          sub={`${sign(liveUnrealizedPnlPct)}${liveUnrealizedPnlPct.toFixed(2)}%`}
+          color={liveUnrealizedPnl >= 0 ? "text-emerald-500" : "text-red-500"}
         />
-        <KpiCard label="Custo total" value={formatCurrency(summary.totalOpenCost)} />
+        <KpiCard label="Custo total" value={formatCurrency(liveOpenCost)} />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Positions table */}
         <div className="xl:col-span-2">
           <Card>
-            <CardHeader className="pb-2">
+            <CardHeader className="pb-2 flex flex-row items-center justify-between">
               <CardTitle className="text-base flex items-center gap-2">
                 <List className="h-4 w-4" />Posições abertas
               </CardTitle>
+              <div className="flex items-center gap-2">
+                {pricesAt && (
+                  <span className="text-xs text-muted-foreground">
+                    {livePrices ? "Live · " : ""}{fmtDate(pricesAt)}
+                  </span>
+                )}
+                <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" onClick={fetchLivePrices} disabled={loadingPrices}>
+                  <RefreshCw className={cn("h-3.5 w-3.5", loadingPrices && "animate-spin")} />
+                  {loadingPrices ? "A atualizar..." : "Preços live"}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
@@ -124,12 +161,17 @@ function PortfolioTab() {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {positions.map((p: any) => (
+                    {positions.map((p: any) => {
+                      const weight = liveMarketTotal > 0 ? (p.marketValueEur / liveMarketTotal) * 100 : 0;
+                      return (
                       <tr key={p.instrumentId} className="hover:bg-muted/30 transition-colors">
                         <td className="px-4 py-2.5">
                           <p className="font-semibold">{p.ticker}</p>
                           <p className="text-xs text-muted-foreground truncate max-w-[180px]">{p.name}</p>
-                          <Badge variant="outline" className="text-[10px] mt-0.5 py-0">{p.subtype ?? p.assetType}</Badge>
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <Badge variant="outline" className="text-[10px] py-0">{p.subtype ?? p.assetType}</Badge>
+                            {p.livePrice && <span className="text-[10px] text-emerald-500 font-medium">{formatCurrency(p.livePrice)}</span>}
+                          </div>
                         </td>
                         <td className="px-4 py-2.5 text-right tabular-nums">
                           {p.quantity.toFixed(4)}
@@ -145,18 +187,18 @@ function PortfolioTab() {
                           <span className="block text-xs">{sign(p.unrealizedPnlPct)}{p.unrealizedPnlPct.toFixed(1)}%</span>
                         </td>
                         <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">
-                          {p.portfolioWeight.toFixed(1)}%
+                          {weight.toFixed(1)}%
                         </td>
                       </tr>
-                    ))}
+                    )})}
                   </tbody>
                   <tfoot className="border-t bg-muted/50">
                     <tr>
                       <td className="px-4 py-2.5 font-semibold" colSpan={2}>Total posições</td>
-                      <td className="px-4 py-2.5 text-right font-semibold tabular-nums">{formatCurrency(summary.totalOpenCost)}</td>
-                      <td className="px-4 py-2.5 text-right font-bold tabular-nums">{formatCurrency(summary.totalMarketValue)}</td>
-                      <td className={cn("px-4 py-2.5 text-right font-bold tabular-nums", summary.totalUnrealizedPnl >= 0 ? "text-emerald-500" : "text-red-500")}>
-                        {sign(summary.totalUnrealizedPnl)}{formatCurrency(summary.totalUnrealizedPnl)}
+                      <td className="px-4 py-2.5 text-right font-semibold tabular-nums">{formatCurrency(liveOpenCost)}</td>
+                      <td className="px-4 py-2.5 text-right font-bold tabular-nums">{formatCurrency(liveMarketTotal)}</td>
+                      <td className={cn("px-4 py-2.5 text-right font-bold tabular-nums", liveUnrealizedPnl >= 0 ? "text-emerald-500" : "text-red-500")}>
+                        {sign(liveUnrealizedPnl)}{formatCurrency(liveUnrealizedPnl)}
                       </td>
                       <td className="px-4 py-2.5 text-right font-semibold">100%</td>
                     </tr>
