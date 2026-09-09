@@ -228,7 +228,7 @@ function PortfolioTab() {
                 <div key={d.name} className="flex items-center gap-2 text-xs">
                   <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: d.fill }} />
                   <span className="flex-1 truncate">{d.name}</span>
-                  <span className="text-muted-foreground">{pct(d.value, summary.totalMarketValue)}</span>
+                  <span className="text-muted-foreground">{pct(d.value, liveMarketTotal)}</span>
                   <span className="font-semibold w-20 text-right">{formatCurrency(d.value)}</span>
                 </div>
               ))}
