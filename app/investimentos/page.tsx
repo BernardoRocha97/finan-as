@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend,
+  PieChart, Pie, Cell, Legend, LineChart, Line, Area, AreaChart, ReferenceLine,
 } from "recharts";
 import { format } from "date-fns";
 import { pt } from "date-fns/locale";
@@ -1069,6 +1069,370 @@ function AllocationTab() {
   );
 }
 
+// ── Projections tab ───────────────────────────────────────────────────────────
+const SCENARIOS = [
+  { key: "conservative", label: "Conservador", return: 0.05, color: "#f59e0b" },
+  { key: "base",         label: "Base",        return: 0.08, color: "#3b82f6" },
+  { key: "optimistic",   label: "Optimista",   return: 0.11, color: "#10b981" },
+];
+
+function buildProjection(
+  start: number, monthlyContrib: number, annualReturn: number,
+  dividendYield: number, reinvest: boolean, years: number, inflationRate: number
+): { year: number; portfolio: number; income: number; contributions: number; real: number }[] {
+  const rows = [];
+  let portfolio = start;
+  let totalContribs = 0;
+  for (let y = 1; y <= years; y++) {
+    const dividends = portfolio * dividendYield;
+    const growth = portfolio * annualReturn;
+    const contrib = monthlyContrib * 12;
+    totalContribs += contrib;
+    if (reinvest) {
+      portfolio = portfolio + growth + contrib;
+    } else {
+      portfolio = portfolio + (growth - dividends) + contrib;
+    }
+    const income = portfolio * dividendYield;
+    const real = portfolio / Math.pow(1 + inflationRate, y);
+    rows.push({ year: new Date().getFullYear() + y, portfolio: Math.round(portfolio), income: Math.round(income), contributions: Math.round(totalContribs), real: Math.round(real) });
+  }
+  return rows;
+}
+
+function ProjecoesTab() {
+  const [portfolioValue, setPortfolioValue] = useState(0);
+  const [loadingPortfolio, setLoadingPortfolio] = useState(true);
+
+  // Inputs
+  const [monthlyContrib, setMonthlyContrib] = useState(200);
+  const [dividendYield, setDividendYield] = useState(5);
+  const [years, setYears] = useState(20);
+  const [inflationRate, setInflationRate] = useState(2.5);
+  const [reinvest, setReinvest] = useState(false);
+
+  // FIRE inputs
+  const [targetMonthlyIncome, setTargetMonthlyIncome] = useState(2000);
+  const [withdrawalRate, setWithdrawalRate] = useState(4);
+
+  useEffect(() => {
+    fetch("/api/portfolio/cash").then((r) => r.json()).then((c) => {
+      const cash = c.data?.cashBalance ?? 0;
+      fetch("/api/portfolio/positions").then((r) => r.json()).then((p) => {
+        const mv = p.data?.summary?.totalMarketValue ?? 0;
+        setPortfolioValue(mv + cash);
+        setLoadingPortfolio(false);
+      });
+    }).catch(() => setLoadingPortfolio(false));
+  }, []);
+
+  // Build all 3 scenarios
+  const allScenarios = SCENARIOS.map((sc) =>
+    buildProjection(portfolioValue, monthlyContrib, sc.return, dividendYield / 100, reinvest, years, inflationRate / 100)
+  );
+
+  // Chart data: merge by year
+  const chartData = allScenarios[0].map((_, i) => {
+    const row: any = { year: allScenarios[0][i].year };
+    SCENARIOS.forEach((sc, si) => {
+      row[sc.key] = allScenarios[si][i].portfolio;
+      row[`${sc.key}_income`] = allScenarios[si][i].income;
+    });
+    return row;
+  });
+
+  // FIRE calculation
+  const fireTarget = (targetMonthlyIncome * 12) / (withdrawalRate / 100);
+  const fireYearByScenario = SCENARIOS.map((sc, si) => {
+    const row = allScenarios[si].find((r) => r.portfolio >= fireTarget);
+    return row ? row.year - new Date().getFullYear() : null;
+  });
+
+  // Income projection at end of horizon
+  const endIncome = SCENARIOS.map((sc, si) => allScenarios[si][years - 1]?.income ?? 0);
+
+  const fmt = (v: number) => v >= 1000000
+    ? `${(v / 1000000).toFixed(2)}M€`
+    : v >= 1000 ? `${(v / 1000).toFixed(1)}k€` : formatCurrency(v);
+
+  if (loadingPortfolio) return <LoadingState />;
+
+  return (
+    <div className="space-y-6">
+      {/* Inputs */}
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-base">Parâmetros de projeção</CardTitle></CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+            <div className="space-y-1">
+              <Label className="text-xs">Carteira atual (€)</Label>
+              <Input className="h-8 text-xs" type="number" value={portfolioValue}
+                onChange={(e) => setPortfolioValue(Number(e.target.value))} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Contribuição mensal (€)</Label>
+              <Input className="h-8 text-xs" type="number" value={monthlyContrib}
+                onChange={(e) => setMonthlyContrib(Number(e.target.value))} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Yield dividendos (%)</Label>
+              <Input className="h-8 text-xs" type="number" step="0.1" value={dividendYield}
+                onChange={(e) => setDividendYield(Number(e.target.value))} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Horizonte (anos)</Label>
+              <Input className="h-8 text-xs" type="number" min="1" max="40" value={years}
+                onChange={(e) => setYears(Number(e.target.value))} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Inflação (%)</Label>
+              <Input className="h-8 text-xs" type="number" step="0.1" value={inflationRate}
+                onChange={(e) => setInflationRate(Number(e.target.value))} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Reinvestir dividendos</Label>
+              <div className="h-8 flex items-center">
+                <button
+                  onClick={() => setReinvest((v) => !v)}
+                  className={cn("w-10 h-5 rounded-full transition-colors relative",
+                    reinvest ? "bg-emerald-500" : "bg-muted-foreground/30")}
+                >
+                  <span className={cn("absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all",
+                    reinvest ? "left-5" : "left-0.5")} />
+                </button>
+                <span className="text-xs text-muted-foreground ml-2">{reinvest ? "Sim" : "Não"}</span>
+              </div>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground mt-3">
+            Retornos por cenário: Conservador {(SCENARIOS[0].return * 100).toFixed(0)}% · Base {(SCENARIOS[1].return * 100).toFixed(0)}% · Optimista {(SCENARIOS[2].return * 100).toFixed(0)}% ao ano (bruto).
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Portfolio projection chart */}
+      <Card>
+        <CardHeader className="pb-2 flex flex-row items-center justify-between">
+          <CardTitle className="text-base">Projeção de carteira — {years} anos</CardTitle>
+          <div className="flex gap-3">
+            {SCENARIOS.map((sc, i) => (
+              <div key={sc.key} className="flex items-center gap-1.5 text-xs">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: sc.color }} />
+                <span className="text-muted-foreground">{sc.label}: <span className="font-semibold text-foreground">{fmt(allScenarios[i][years - 1]?.portfolio ?? 0)}</span></span>
+              </div>
+            ))}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={280}>
+            <AreaChart data={chartData}>
+              <defs>
+                {SCENARIOS.map((sc) => (
+                  <linearGradient key={sc.key} id={`grad-${sc.key}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={sc.color} stopOpacity={0.15} />
+                    <stop offset="95%" stopColor={sc.color} stopOpacity={0} />
+                  </linearGradient>
+                ))}
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-muted" />
+              <XAxis dataKey="year" tick={{ fontSize: 10 }} axisLine={false} tickLine={false}
+                tickFormatter={(v, i) => i % 5 === 0 ? String(v) : ""} />
+              <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={fmt} width={56} />
+              <Tooltip formatter={(v: any, name: any) => {
+                const sc = SCENARIOS.find((s) => s.key === name);
+                return [fmt(v), sc?.label ?? name];
+              }} />
+              {SCENARIOS.map((sc) => (
+                <Area key={sc.key} type="monotone" dataKey={sc.key} stroke={sc.color} strokeWidth={2}
+                  fill={`url(#grad-${sc.key})`} dot={false} name={sc.key} />
+              ))}
+              {portfolioValue > 0 && fireTarget > portfolioValue && (
+                <ReferenceLine y={fireTarget} stroke="#ef4444" strokeDasharray="4 4"
+                  label={{ value: "FIRE", position: "insideTopRight", fontSize: 10, fill: "#ef4444" }} />
+              )}
+            </AreaChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Income projection chart */}
+      <Card>
+        <CardHeader className="pb-2 flex flex-row items-center justify-between">
+          <CardTitle className="text-base">Rendimento anual projetado</CardTitle>
+          <div className="flex gap-3">
+            {SCENARIOS.map((sc, i) => (
+              <div key={sc.key} className="flex items-center gap-1.5 text-xs">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: sc.color }} />
+                <span className="text-muted-foreground">{sc.label}: <span className="font-semibold text-foreground">{formatCurrency(endIncome[i])}/ano</span></span>
+              </div>
+            ))}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-muted" />
+              <XAxis dataKey="year" tick={{ fontSize: 10 }} axisLine={false} tickLine={false}
+                tickFormatter={(v, i) => i % 5 === 0 ? String(v) : ""} />
+              <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={fmt} width={56} />
+              <Tooltip formatter={(v: any, name: any) => {
+                const sc = SCENARIOS.find((s) => `${s.key}_income` === name);
+                return [formatCurrency(v), sc?.label ?? name];
+              }} />
+              {SCENARIOS.map((sc) => (
+                <Line key={sc.key} type="monotone" dataKey={`${sc.key}_income`} stroke={sc.color}
+                  strokeWidth={2} dot={false} name={`${sc.key}_income`} />
+              ))}
+              {targetMonthlyIncome > 0 && (
+                <ReferenceLine y={targetMonthlyIncome * 12} stroke="#ef4444" strokeDasharray="4 4"
+                  label={{ value: `Meta: ${formatCurrency(targetMonthlyIncome)}/mês`, position: "insideTopRight", fontSize: 10, fill: "#ef4444" }} />
+              )}
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* FIRE calculator */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-base">Calculadora FIRE</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label className="text-xs">Rendimento mensal alvo (€)</Label>
+                <Input className="h-8 text-xs" type="number" value={targetMonthlyIncome}
+                  onChange={(e) => setTargetMonthlyIncome(Number(e.target.value))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Taxa de levantamento (%)</Label>
+                <Input className="h-8 text-xs" type="number" step="0.1" value={withdrawalRate}
+                  onChange={(e) => setWithdrawalRate(Number(e.target.value))} />
+              </div>
+            </div>
+
+            <div className="p-4 bg-muted/50 rounded-xl space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Carteira necessária (regra dos {withdrawalRate}%)</span>
+                <span className="font-bold text-xl">{fmt(fireTarget)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Carteira atual</span>
+                <span className="font-semibold">{fmt(portfolioValue)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Falta</span>
+                <span className={cn("font-bold", fireTarget > portfolioValue ? "text-amber-500" : "text-emerald-500")}>
+                  {fireTarget <= portfolioValue ? "Já atingido!" : fmt(fireTarget - portfolioValue)}
+                </span>
+              </div>
+              <div className="h-2 rounded-full bg-muted overflow-hidden mt-1">
+                <div className="h-full rounded-full bg-emerald-500 transition-all"
+                  style={{ width: `${Math.min((portfolioValue / fireTarget) * 100, 100).toFixed(1)}%` }} />
+              </div>
+              <p className="text-xs text-muted-foreground text-right">{((portfolioValue / fireTarget) * 100).toFixed(1)}% do objectivo</p>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Anos até FIRE por cenário:</p>
+              {SCENARIOS.map((sc, i) => (
+                <div key={sc.key} className="flex items-center gap-3">
+                  <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: sc.color }} />
+                  <span className="text-sm flex-1">{sc.label}</span>
+                  <span className="font-bold tabular-nums">
+                    {fireYearByScenario[i] !== null
+                      ? `${fireYearByScenario[i]} anos (${new Date().getFullYear() + fireYearByScenario[i]!})`
+                      : `> ${years} anos`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Summary table */}
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-base">Resumo em {years} anos</CardTitle></CardHeader>
+          <CardContent className="p-0">
+            <table className="w-full text-sm">
+              <thead className="bg-muted">
+                <tr>
+                  <th className="text-left px-4 py-2.5 font-medium">Cenário</th>
+                  <th className="text-right px-4 py-2.5 font-medium">Carteira</th>
+                  <th className="text-right px-4 py-2.5 font-medium">Rend. Anual</th>
+                  <th className="text-right px-4 py-2.5 font-medium">Rend. Mensal</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {SCENARIOS.map((sc, i) => {
+                  const last = allScenarios[i][years - 1];
+                  return (
+                    <tr key={sc.key} className="hover:bg-muted/30">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: sc.color }} />
+                          <span className="font-medium">{sc.label}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground ml-4">{(sc.return * 100).toFixed(0)}%/ano</p>
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold tabular-nums">{fmt(last?.portfolio ?? 0)}</td>
+                      <td className="px-4 py-3 text-right text-emerald-500 font-semibold tabular-nums">{fmt(last?.income ?? 0)}</td>
+                      <td className="px-4 py-3 text-right text-emerald-500 tabular-nums">{formatCurrency((last?.income ?? 0) / 12)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <div className="px-4 py-3 border-t">
+              <p className="text-xs text-muted-foreground">
+                Valores nominais. Real (ajust. {inflationRate}% inflação) no cenário base em {years} anos: {fmt(allScenarios[1][years - 1]?.real ?? 0)}.
+                Não constitui aconselhamento financeiro.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Milestone table — every 5 years */}
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-base">Milestones (cenário base)</CardTitle></CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted">
+                <tr>
+                  <th className="text-left px-4 py-2.5 font-medium">Ano</th>
+                  <th className="text-right px-4 py-2.5 font-medium">Carteira</th>
+                  <th className="text-right px-4 py-2.5 font-medium">Contribuições</th>
+                  <th className="text-right px-4 py-2.5 font-medium">Rend. Anual</th>
+                  <th className="text-right px-4 py-2.5 font-medium">Rend. Mensal</th>
+                  <th className="text-right px-4 py-2.5 font-medium">Real (inflação)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {allScenarios[1]
+                  .filter((_, i) => (i + 1) % 5 === 0 || i === 0)
+                  .map((r) => (
+                    <tr key={r.year} className={cn("hover:bg-muted/30", r.portfolio >= fireTarget && "bg-emerald-50/50 dark:bg-emerald-900/10")}>
+                      <td className="px-4 py-2.5 font-medium">
+                        {r.year}
+                        {r.portfolio >= fireTarget && <span className="ml-2 text-[10px] text-emerald-500 font-bold">FIRE</span>}
+                      </td>
+                      <td className="px-4 py-2.5 text-right font-bold tabular-nums">{fmt(r.portfolio)}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{fmt(r.contributions)}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-emerald-500">{fmt(r.income)}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-emerald-500">{formatCurrency(r.income / 12)}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{fmt(r.real)}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 // ── Shared states ─────────────────────────────────────────────────────────────
 function LoadingState() {
   return (
@@ -1108,6 +1472,7 @@ export default function InvestimentosPage() {
           <TabsTrigger value="allocation" className="gap-1.5"><Target className="h-3.5 w-3.5" />Alocação</TabsTrigger>
           <TabsTrigger value="transactions" className="gap-1.5"><List className="h-3.5 w-3.5" />Transações</TabsTrigger>
           <TabsTrigger value="import" className="gap-1.5"><Upload className="h-3.5 w-3.5" />Importar XTB</TabsTrigger>
+          <TabsTrigger value="projections" className="gap-1.5"><TrendingUp className="h-3.5 w-3.5" />Projeções</TabsTrigger>
         </TabsList>
 
         <TabsContent value="portfolio" className="mt-6"><PortfolioTab /></TabsContent>
@@ -1118,6 +1483,7 @@ export default function InvestimentosPage() {
         <TabsContent value="import" className="mt-6">
           <ImportTab onDone={() => setTab("portfolio")} />
         </TabsContent>
+        <TabsContent value="projections" className="mt-6"><ProjecoesTab /></TabsContent>
       </Tabs>
     </div>
   );
