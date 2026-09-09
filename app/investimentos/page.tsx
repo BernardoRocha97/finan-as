@@ -7,8 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  TrendingUp, TrendingDown, RefreshCw, AlertCircle, Wallet, BarChart3,
-  ArrowUpRight, ArrowDownRight, Upload, List, Calendar, DollarSign,
+  TrendingUp, RefreshCw, AlertCircle, BarChart3,
+  Upload, List, Calendar, DollarSign, Zap,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -645,6 +645,148 @@ function ImportTab({ onDone }: { onDone: () => void }) {
   );
 }
 
+// ── Performance tab ──────────────────────────────────────────────────────────
+function PerformanceTab() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    fetch("/api/portfolio/performance").then((r) => r.json()).then((d) => {
+      if (d.error) throw new Error(d.error);
+      setData(d.data);
+    }).catch((e) => setErr(e.message)).finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <LoadingState />;
+  if (err) return <ErrorState msg={err} onRetry={load} />;
+  if (!data) return null;
+
+  const { portfolio, instruments } = data;
+
+  const xirrColor = (v: number | null) => {
+    if (v === null) return "text-muted-foreground";
+    if (v >= 10) return "text-emerald-500";
+    if (v >= 5) return "text-blue-500";
+    if (v >= 0) return "text-amber-500";
+    return "text-red-500";
+  };
+
+  // Bar chart: total return per instrument
+  const barData = instruments
+    .filter((i: any) => i.totalBuyEur > 0)
+    .map((i: any) => ({ name: i.ticker, retorno: i.totalReturn, pct: i.totalReturnPct }))
+    .sort((a: any, b: any) => b.retorno - a.retorno);
+
+  return (
+    <div className="space-y-6">
+      {/* Portfolio KPIs */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Card>
+          <CardContent className="pt-5 pb-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">XIRR carteira</p>
+            <p className={cn("text-3xl font-bold mt-1 tabular-nums", xirrColor(portfolio.xirr))}>
+              {portfolio.xirr !== null ? `${portfolio.xirr >= 0 ? "+" : ""}${portfolio.xirr.toFixed(2)}%` : "—"}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">rentabilidade anualizada real</p>
+          </CardContent>
+        </Card>
+        <KpiCard label="Yield on Cost (TTM)" value={`${portfolio.portfolioYieldOnCost.toFixed(2)}%`}
+          sub="rendimento / custo aberto" color="text-amber-500" />
+        <KpiCard label="Rendimento TTM" value={formatCurrency(portfolio.ttmIncome)}
+          sub="últimos 12 meses" color="text-emerald-500" />
+        <KpiCard label="Dividendos total" value={formatCurrency(portfolio.totalDividends)} />
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <KpiCard label="Capital investido" value={formatCurrency(portfolio.totalDeployed)} />
+        <KpiCard label="Recuperado (vendas+div)" value={formatCurrency(portfolio.totalReturned)} />
+        <KpiCard label="Valor aberto atual" value={formatCurrency(portfolio.totalOpenValue)} />
+        <KpiCard
+          label="Retorno total estimado"
+          value={formatCurrency(portfolio.totalReturned + portfolio.totalOpenValue - portfolio.totalDeployed)}
+          color={(portfolio.totalReturned + portfolio.totalOpenValue - portfolio.totalDeployed) >= 0 ? "text-emerald-500" : "text-red-500"}
+        />
+      </div>
+
+      {/* Return chart */}
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-base">Retorno total por ativo</CardTitle></CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={barData} layout="vertical" barSize={16}>
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} className="stroke-muted" />
+              <XAxis type="number" tick={{ fontSize: 10 }} axisLine={false} tickLine={false}
+                tickFormatter={(v) => `${v > 0 ? "+" : ""}${formatCurrency(v)}`} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} width={64} />
+              <Tooltip formatter={(v: any, name: string) => [name === "retorno" ? formatCurrency(v) : `${v}%`, name === "retorno" ? "Retorno €" : "Retorno %"]} />
+              <Bar dataKey="retorno" name="retorno" radius={[0, 4, 4, 0]}>
+                {barData.map((d: any, i: number) => (
+                  <Cell key={i} fill={d.retorno >= 0 ? "#10b981" : "#ef4444"} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Per-instrument table */}
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-base">Métricas por instrumento</CardTitle></CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted">
+                <tr>
+                  <th className="text-left px-4 py-2.5 font-medium">Ativo</th>
+                  <th className="text-right px-4 py-2.5 font-medium">Investido</th>
+                  <th className="text-right px-4 py-2.5 font-medium">Vendas</th>
+                  <th className="text-right px-4 py-2.5 font-medium">Dividendos</th>
+                  <th className="text-right px-4 py-2.5 font-medium">Em aberto</th>
+                  <th className="text-right px-4 py-2.5 font-medium">Retorno</th>
+                  <th className="text-right px-4 py-2.5 font-medium">XIRR</th>
+                  <th className="text-right px-4 py-2.5 font-medium">YoC TTM</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {instruments.map((i: any) => (
+                  <tr key={i.instrumentId} className="hover:bg-muted/30 transition-colors">
+                    <td className="px-4 py-2.5">
+                      <p className="font-semibold">{i.ticker}</p>
+                      <p className="text-xs text-muted-foreground truncate max-w-[160px]">{i.name}</p>
+                    </td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">{formatCurrency(i.totalBuyEur)}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{i.totalSellEur > 0 ? formatCurrency(i.totalSellEur) : "—"}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-emerald-500">{i.totalDividendEur > 0 ? formatCurrency(i.totalDividendEur) : "—"}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">{i.openCostEur > 0 ? formatCurrency(i.openCostEur) : "—"}</td>
+                    <td className={cn("px-4 py-2.5 text-right tabular-nums font-semibold", i.totalReturn >= 0 ? "text-emerald-500" : "text-red-500")}>
+                      <span>{i.totalReturn >= 0 ? "+" : ""}{formatCurrency(i.totalReturn)}</span>
+                      <span className="block text-xs font-normal">{i.totalReturnPct >= 0 ? "+" : ""}{i.totalReturnPct.toFixed(1)}%</span>
+                    </td>
+                    <td className={cn("px-4 py-2.5 text-right tabular-nums font-semibold", xirrColor(i.xirr))}>
+                      {i.xirr !== null ? `${i.xirr >= 0 ? "+" : ""}${i.xirr.toFixed(1)}%` : "—"}
+                    </td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-amber-500 font-medium">
+                      {i.yieldOnCost > 0 ? `${i.yieldOnCost.toFixed(2)}%` : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <p className="text-xs text-muted-foreground">
+        XIRR usa o valor de custo dos lotes abertos como valor terminal (sem preços live). Para XIRR preciso, carrega preços live na tab Portfolio.
+      </p>
+    </div>
+  );
+}
+
 // ── Shared states ─────────────────────────────────────────────────────────────
 function LoadingState() {
   return (
@@ -680,12 +822,14 @@ export default function InvestimentosPage() {
         <TabsList>
           <TabsTrigger value="portfolio" className="gap-1.5"><BarChart3 className="h-3.5 w-3.5" />Portfolio</TabsTrigger>
           <TabsTrigger value="income" className="gap-1.5"><DollarSign className="h-3.5 w-3.5" />Rendimentos</TabsTrigger>
+          <TabsTrigger value="performance" className="gap-1.5"><Zap className="h-3.5 w-3.5" />Performance</TabsTrigger>
           <TabsTrigger value="transactions" className="gap-1.5"><List className="h-3.5 w-3.5" />Transações</TabsTrigger>
           <TabsTrigger value="import" className="gap-1.5"><Upload className="h-3.5 w-3.5" />Importar XTB</TabsTrigger>
         </TabsList>
 
         <TabsContent value="portfolio" className="mt-6"><PortfolioTab /></TabsContent>
         <TabsContent value="income" className="mt-6"><IncomeTab /></TabsContent>
+        <TabsContent value="performance" className="mt-6"><PerformanceTab /></TabsContent>
         <TabsContent value="transactions" className="mt-6"><TransactionsTab /></TabsContent>
         <TabsContent value="import" className="mt-6">
           <ImportTab onDone={() => setTab("portfolio")} />
