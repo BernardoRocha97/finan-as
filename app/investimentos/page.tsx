@@ -8,8 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   TrendingUp, RefreshCw, AlertCircle, BarChart3,
-  Upload, List, Calendar, DollarSign, Zap,
+  Upload, List, Calendar, DollarSign, Zap, Target, Trash2, Plus, Check,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
@@ -787,6 +789,286 @@ function PerformanceTab() {
   );
 }
 
+// ── Allocation tab ────────────────────────────────────────────────────────────
+const STATUS_CFG: Record<string, { label: string; cls: string }> = {
+  OK:          { label: "OK",          cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" },
+  OVERWEIGHT:  { label: "Excesso",     cls: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300" },
+  UNDERWEIGHT: { label: "Deficit",     cls: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300" },
+  NO_TARGET:   { label: "Sem target",  cls: "bg-muted text-muted-foreground" },
+  NOT_HELD:    { label: "Não detido",  cls: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" },
+};
+
+function AllocationTab() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+  const [instruments, setInstruments] = useState<any[]>([]);
+  const [form, setForm] = useState({ instrumentId: "", targetWeight: "", minWeight: "", maxWeight: "", priority: "0", notes: "" });
+  const [saving, setSaving] = useState(false);
+  const [editRow, setEditRow] = useState<string | null>(null);
+  const [editWeight, setEditWeight] = useState("");
+
+  const load = useCallback(() => {
+    setLoading(true);
+    Promise.all([
+      fetch("/api/portfolio/allocation").then((r) => r.json()),
+      fetch("/api/portfolio/positions").then((r) => r.json()),
+    ]).then(([alloc, pos]) => {
+      if (alloc.error) throw new Error(alloc.error);
+      setData(alloc.data);
+      setInstruments(pos.data?.positions ?? []);
+    }).catch((e) => setErr(e.message)).finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const save = async () => {
+    if (!form.instrumentId || !form.targetWeight) return;
+    setSaving(true);
+    await fetch("/api/portfolio/allocation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        instrumentId: form.instrumentId,
+        targetWeight: Number(form.targetWeight),
+        minWeight: form.minWeight ? Number(form.minWeight) : null,
+        maxWeight: form.maxWeight ? Number(form.maxWeight) : null,
+        priority: Number(form.priority),
+        notes: form.notes || null,
+      }),
+    });
+    setSaving(false);
+    setForm({ instrumentId: "", targetWeight: "", minWeight: "", maxWeight: "", priority: "0", notes: "" });
+    load();
+  };
+
+  const quickEdit = async (instrumentId: string, targetWeight: number) => {
+    await fetch("/api/portfolio/allocation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ instrumentId, targetWeight }),
+    });
+    setEditRow(null);
+    load();
+  };
+
+  const remove = async (targetId: string) => {
+    await fetch(`/api/portfolio/allocation/${targetId}`, { method: "DELETE" });
+    load();
+  };
+
+  if (loading) return <LoadingState />;
+  if (err) return <ErrorState msg={err} onRetry={load} />;
+  if (!data) return null;
+
+  const { rows, buyQueue, summary } = data;
+
+  // Gap bar: max abs gap for scaling
+  const maxGap = Math.max(...rows.map((r: any) => Math.abs(r.gap)), 5);
+
+  return (
+    <div className="space-y-6">
+      {/* Summary KPIs */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <KpiCard label="Valor total" value={formatCurrency(summary.totalValue)} />
+        <KpiCard label="Targets definidos" value={`${summary.targetsSet}`} sub={`soma: ${summary.targetTotal.toFixed(1)}%`} />
+        <KpiCard label="Em deficit" value={`${summary.underweight}`} color={summary.underweight > 0 ? "text-amber-500" : "text-muted-foreground"} />
+        <KpiCard label="Em excesso" value={`${summary.overweight}`} color={summary.overweight > 0 ? "text-red-500" : "text-muted-foreground"} />
+        <KpiCard label="OK" value={`${summary.ok}`} color="text-emerald-500" />
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Main allocation table */}
+        <div className="xl:col-span-2 space-y-4">
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Target className="h-4 w-4" />Peso atual vs target</CardTitle></CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted">
+                    <tr>
+                      <th className="text-left px-4 py-2.5 font-medium">Ativo</th>
+                      <th className="text-right px-4 py-2.5 font-medium">Atual</th>
+                      <th className="text-right px-4 py-2.5 font-medium">Target</th>
+                      <th className="text-right px-4 py-2.5 font-medium">Gap</th>
+                      <th className="px-4 py-2.5 font-medium">Barra</th>
+                      <th className="text-center px-4 py-2.5 font-medium">Estado</th>
+                      <th className="px-2 py-2.5" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {rows.map((r: any) => {
+                      const cfg = STATUS_CFG[r.status] ?? STATUS_CFG.NO_TARGET;
+                      const isEditing = editRow === r.instrumentId;
+                      return (
+                        <tr key={r.instrumentId} className="hover:bg-muted/30 transition-colors">
+                          <td className="px-4 py-2.5">
+                            <p className="font-semibold">{r.ticker}</p>
+                            <p className="text-xs text-muted-foreground truncate max-w-[160px]">{r.name}</p>
+                          </td>
+                          <td className="px-4 py-2.5 text-right tabular-nums font-medium">{r.currentWeight.toFixed(1)}%</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">
+                            {isEditing ? (
+                              <Input
+                                className="w-20 h-6 text-xs text-right p-1"
+                                value={editWeight}
+                                onChange={(e) => setEditWeight(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") quickEdit(r.instrumentId, Number(editWeight));
+                                  if (e.key === "Escape") setEditRow(null);
+                                }}
+                                autoFocus
+                              />
+                            ) : (
+                              <span
+                                className="cursor-pointer hover:text-foreground transition-colors"
+                                onClick={() => { setEditRow(r.instrumentId); setEditWeight(String(r.targetWeight)); }}
+                              >
+                                {r.targetWeight > 0 ? `${r.targetWeight.toFixed(1)}%` : "—"}
+                              </span>
+                            )}
+                          </td>
+                          <td className={cn("px-4 py-2.5 text-right tabular-nums font-semibold", r.gap > 0 ? "text-red-500" : r.gap < 0 ? "text-amber-500" : "text-muted-foreground")}>
+                            {r.targetWeight > 0 ? `${r.gap > 0 ? "+" : ""}${r.gap.toFixed(1)}%` : "—"}
+                          </td>
+                          <td className="px-4 py-2.5 w-28">
+                            {r.targetWeight > 0 && (
+                              <div className="relative h-3 bg-muted rounded-full overflow-hidden">
+                                {/* Target marker */}
+                                <div className="absolute top-0 bottom-0 w-0.5 bg-foreground/40 z-10"
+                                  style={{ left: `${(r.targetWeight / (r.targetWeight + maxGap)) * 50}%` }} />
+                                {/* Current bar */}
+                                <div className={cn("absolute top-0 bottom-0 rounded-full", r.gap > 0 ? "bg-red-400" : "bg-emerald-400")}
+                                  style={{ width: `${Math.min((r.currentWeight / (r.targetWeight + maxGap)) * 50, 100)}%` }} />
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5 text-center">
+                            <span className={cn("inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium", cfg.cls)}>{cfg.label}</span>
+                          </td>
+                          <td className="px-2 py-2.5">
+                            <div className="flex items-center gap-1">
+                              {isEditing && (
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-emerald-500"
+                                  onClick={() => quickEdit(r.instrumentId, Number(editWeight))}>
+                                  <Check className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                              {r.targetId && (
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-red-400 hover:text-red-600"
+                                  onClick={() => remove(r.targetId)}>
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Buy queue */}
+          {buyQueue.length > 0 && (
+            <Card className="border-amber-200 dark:border-amber-800">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base text-amber-600 dark:text-amber-400">Fila de compras — mais subponderado primeiro</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <table className="w-full text-sm">
+                  <thead className="bg-amber-50 dark:bg-amber-900/20">
+                    <tr>
+                      <th className="text-left px-4 py-2 font-medium text-amber-700 dark:text-amber-300">#</th>
+                      <th className="text-left px-4 py-2 font-medium text-amber-700 dark:text-amber-300">Ativo</th>
+                      <th className="text-right px-4 py-2 font-medium text-amber-700 dark:text-amber-300">Atual</th>
+                      <th className="text-right px-4 py-2 font-medium text-amber-700 dark:text-amber-300">Target</th>
+                      <th className="text-right px-4 py-2 font-medium text-amber-700 dark:text-amber-300">Deficit</th>
+                      <th className="text-right px-4 py-2 font-medium text-amber-700 dark:text-amber-300">Montante</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {buyQueue.map((r: any, idx: number) => {
+                      const deficitPct = Math.abs(r.gap);
+                      const buyAmount = (deficitPct / 100) * summary.totalValue;
+                      return (
+                        <tr key={r.instrumentId} className="hover:bg-amber-50/50 dark:hover:bg-amber-900/10">
+                          <td className="px-4 py-2.5 text-muted-foreground font-bold">#{idx + 1}</td>
+                          <td className="px-4 py-2.5">
+                            <p className="font-semibold">{r.ticker}</p>
+                            <p className="text-xs text-muted-foreground">{r.name}</p>
+                          </td>
+                          <td className="px-4 py-2.5 text-right tabular-nums">{r.currentWeight.toFixed(1)}%</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{r.targetWeight.toFixed(1)}%</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums text-amber-600 font-semibold">-{deficitPct.toFixed(1)}%</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums font-bold text-amber-600">{formatCurrency(buyAmount)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Add target form */}
+        <Card className="h-fit">
+          <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Plus className="h-4 w-4" />Definir target</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Instrumento</Label>
+              <Select value={form.instrumentId} onValueChange={(v) => setForm({ ...form, instrumentId: v })}>
+                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Seleciona..." /></SelectTrigger>
+                <SelectContent>
+                  {instruments.map((i: any) => (
+                    <SelectItem key={i.instrumentId} value={i.instrumentId}>{i.ticker} — {i.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Target %</Label>
+                <Input className="h-8 text-xs" type="number" step="0.5" placeholder="Ex: 15.0"
+                  value={form.targetWeight} onChange={(e) => setForm({ ...form, targetWeight: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Prioridade</Label>
+                <Input className="h-8 text-xs" type="number" step="1" placeholder="0"
+                  value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Mín %</Label>
+                <Input className="h-8 text-xs" type="number" step="0.5" placeholder="opcional"
+                  value={form.minWeight} onChange={(e) => setForm({ ...form, minWeight: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Máx %</Label>
+                <Input className="h-8 text-xs" type="number" step="0.5" placeholder="opcional"
+                  value={form.maxWeight} onChange={(e) => setForm({ ...form, maxWeight: e.target.value })} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Notas</Label>
+              <Input className="h-8 text-xs" placeholder="opcional"
+                value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+            </div>
+            <Button className="w-full h-8 text-xs" onClick={save} disabled={saving || !form.instrumentId || !form.targetWeight}>
+              {saving ? "A guardar..." : "Guardar target"}
+            </Button>
+            <p className="text-xs text-muted-foreground">Clica no valor Target na tabela para editar inline.</p>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 // ── Shared states ─────────────────────────────────────────────────────────────
 function LoadingState() {
   return (
@@ -823,6 +1105,7 @@ export default function InvestimentosPage() {
           <TabsTrigger value="portfolio" className="gap-1.5"><BarChart3 className="h-3.5 w-3.5" />Portfolio</TabsTrigger>
           <TabsTrigger value="income" className="gap-1.5"><DollarSign className="h-3.5 w-3.5" />Rendimentos</TabsTrigger>
           <TabsTrigger value="performance" className="gap-1.5"><Zap className="h-3.5 w-3.5" />Performance</TabsTrigger>
+          <TabsTrigger value="allocation" className="gap-1.5"><Target className="h-3.5 w-3.5" />Alocação</TabsTrigger>
           <TabsTrigger value="transactions" className="gap-1.5"><List className="h-3.5 w-3.5" />Transações</TabsTrigger>
           <TabsTrigger value="import" className="gap-1.5"><Upload className="h-3.5 w-3.5" />Importar XTB</TabsTrigger>
         </TabsList>
@@ -830,6 +1113,7 @@ export default function InvestimentosPage() {
         <TabsContent value="portfolio" className="mt-6"><PortfolioTab /></TabsContent>
         <TabsContent value="income" className="mt-6"><IncomeTab /></TabsContent>
         <TabsContent value="performance" className="mt-6"><PerformanceTab /></TabsContent>
+        <TabsContent value="allocation" className="mt-6"><AllocationTab /></TabsContent>
         <TabsContent value="transactions" className="mt-6"><TransactionsTab /></TabsContent>
         <TabsContent value="import" className="mt-6">
           <ImportTab onDone={() => setTab("portfolio")} />
