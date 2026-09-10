@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { formatCurrency, cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -56,6 +56,10 @@ function PortfolioTab() {
   const [loading, setLoading] = useState(true);
   const [loadingPrices, setLoadingPrices] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+  const toggleRow = (id: string) =>
+    setExpandedRows((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
   const [pricesAt, setPricesAt] = useState<string | null>(null);
 
   const load = useCallback(() => {
@@ -154,6 +158,7 @@ function PortfolioTab() {
                 <table className="w-full text-sm">
                   <thead className="bg-muted">
                     <tr>
+                      <th className="text-left px-4 py-2.5 font-medium w-6"></th>
                       <th className="text-left px-4 py-2.5 font-medium">Ativo</th>
                       <th className="text-right px-4 py-2.5 font-medium">Qtd</th>
                       <th className="text-right px-4 py-2.5 font-medium">Custo €</th>
@@ -165,37 +170,65 @@ function PortfolioTab() {
                   <tbody className="divide-y">
                     {positions.map((p: any) => {
                       const weight = liveMarketTotal > 0 ? (p.marketValueEur / liveMarketTotal) * 100 : 0;
+                      const expanded = expandedRows.has(p.instrumentId);
+                      const hasLots = p.lots?.length > 1;
                       return (
-                      <tr key={p.instrumentId} className="hover:bg-muted/30 transition-colors">
+                      <React.Fragment key={p.instrumentId}>
+                      <tr
+                        className={cn("transition-colors", hasLots ? "cursor-pointer hover:bg-muted/40" : "hover:bg-muted/30")}
+                        onClick={() => hasLots && toggleRow(p.instrumentId)}
+                      >
+                        <td className="px-3 py-2.5 text-muted-foreground">
+                          {hasLots && (
+                            <span className="text-xs select-none">{expanded ? "▾" : "▸"}</span>
+                          )}
+                        </td>
                         <td className="px-4 py-2.5">
                           <p className="font-semibold">{p.ticker}</p>
-                          <p className="text-xs text-muted-foreground truncate max-w-[180px]">{p.name}</p>
+                          <p className="text-xs text-muted-foreground truncate max-w-[160px]">{p.name}</p>
                           <div className="flex items-center gap-1 mt-0.5">
                             <Badge variant="outline" className="text-[10px] py-0">{p.subtype ?? p.assetType}</Badge>
                             {p.livePrice && <span className="text-[10px] text-emerald-500 font-medium">{formatCurrency(p.livePrice)}</span>}
+                            {hasLots && <span className="text-[10px] text-muted-foreground">{p.lots.length} lotes</span>}
                           </div>
                         </td>
-                        <td className="px-4 py-2.5 text-right tabular-nums">
-                          {p.quantity.toFixed(4)}
-                        </td>
-                        <td className="px-4 py-2.5 text-right tabular-nums">
-                          {formatCurrency(p.openCostEur)}
-                        </td>
-                        <td className="px-4 py-2.5 text-right tabular-nums font-medium">
-                          {formatCurrency(p.marketValueEur)}
-                        </td>
+                        <td className="px-4 py-2.5 text-right tabular-nums">{p.quantity.toFixed(4)}</td>
+                        <td className="px-4 py-2.5 text-right tabular-nums">{formatCurrency(p.openCostEur)}</td>
+                        <td className="px-4 py-2.5 text-right tabular-nums font-medium">{formatCurrency(p.marketValueEur)}</td>
                         <td className={cn("px-4 py-2.5 text-right tabular-nums", p.unrealizedPnl >= 0 ? "text-emerald-500" : "text-red-500")}>
                           <span className="font-semibold">{sign(p.unrealizedPnl)}{formatCurrency(p.unrealizedPnl)}</span>
                           <span className="block text-xs">{sign(p.unrealizedPnlPct)}{p.unrealizedPnlPct.toFixed(1)}%</span>
                         </td>
-                        <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">
-                          {weight.toFixed(1)}%
-                        </td>
+                        <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{weight.toFixed(1)}%</td>
                       </tr>
+                      {expanded && p.lots?.map((lot: any) => {
+                        const lotMv = p.livePrice ? lot.remainingQuantity * p.livePrice : lot.costEur;
+                        const lotPnl = lotMv - lot.costEur;
+                        const lotPnlPct = lot.costEur > 0 ? (lotPnl / lot.costEur) * 100 : 0;
+                        return (
+                          <tr key={lot.id} className="bg-muted/20 text-xs border-l-2 border-l-primary/20">
+                            <td className="px-3 py-1.5" />
+                            <td className="px-4 py-1.5 text-muted-foreground">
+                              <span className="font-medium text-foreground">{new Date(lot.purchaseDate).toLocaleDateString("pt-PT")}</span>
+                              <span className="ml-2">@ {formatCurrency(lot.unitCost)}/un</span>
+                            </td>
+                            <td className="px-4 py-1.5 text-right tabular-nums text-muted-foreground">{lot.remainingQuantity.toFixed(4)}</td>
+                            <td className="px-4 py-1.5 text-right tabular-nums text-muted-foreground">{formatCurrency(lot.costEur)}</td>
+                            <td className="px-4 py-1.5 text-right tabular-nums text-muted-foreground">{formatCurrency(lotMv)}</td>
+                            <td className={cn("px-4 py-1.5 text-right tabular-nums", lotPnl >= 0 ? "text-emerald-500" : "text-red-500")}>
+                              {sign(lotPnl)}{formatCurrency(lotPnl)}
+                              <span className="block text-[10px]">{sign(lotPnlPct)}{lotPnlPct.toFixed(1)}%</span>
+                            </td>
+                            <td className="px-4 py-1.5" />
+                          </tr>
+                        );
+                      })}
+                      </React.Fragment>
                     )})}
                   </tbody>
                   <tfoot className="border-t bg-muted/50">
                     <tr>
+                      <td className="px-3 py-2.5" />
                       <td className="px-4 py-2.5 font-semibold" colSpan={2}>Total posições</td>
                       <td className="px-4 py-2.5 text-right font-semibold tabular-nums">{formatCurrency(liveOpenCost)}</td>
                       <td className="px-4 py-2.5 text-right font-bold tabular-nums">{formatCurrency(liveMarketTotal)}</td>
