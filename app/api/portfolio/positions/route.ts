@@ -40,30 +40,13 @@ export async function GET() {
       pos.totalCostNative += Number(lot.totalCost) * Number(lot.remainingQuantity) / Number(lot.originalQuantity);
     }
 
-    // Get current market values from latest snapshot or stored values
-    // For now, use the values from the open position transactions (amountEur)
-    const openTxMap = new Map<string, number>();
-    const openTxs = await prisma.portfolioTransaction.findMany({
-      where: {
-        transactionType: "BUY",
-        broker: "XTB",
-        positionId: { not: null },
-      },
-      select: { positionId: true, amountEur: true, instrumentId: true },
-    });
-    for (const tx of openTxs) {
-      if (!tx.instrumentId || !tx.amountEur) continue;
-      const cur = openTxMap.get(tx.instrumentId) || 0;
-      openTxMap.set(tx.instrumentId, cur + Number(tx.amountEur));
-    }
-
     const positions = Array.from(positionMap.values()).map((pos) => {
       const totalQuantity = pos.totalQuantity;
       const openCostEur = pos.totalCostEur;
       const averageCostNative = totalQuantity > 0 ? pos.totalCostNative / totalQuantity : 0;
 
-      // Market value from stored lot values (amountEur in open position BUY transactions)
-      const marketValueEur = openTxMap.get(pos.instrument.id) || openCostEur;
+      // Use cost basis as market value proxy until live prices are fetched by the client
+      const marketValueEur = openCostEur;
       const unrealizedPnl = marketValueEur - openCostEur;
       const unrealizedPnlPct = openCostEur > 0 ? (unrealizedPnl / openCostEur) * 100 : 0;
 

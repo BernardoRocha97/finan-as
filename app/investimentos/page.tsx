@@ -1116,13 +1116,11 @@ function ProjecoesTab() {
   const [withdrawalRate, setWithdrawalRate] = useState(4);
 
   useEffect(() => {
-    fetch("/api/portfolio/cash").then((r) => r.json()).then((c) => {
-      const cash = c.data?.cashBalance ?? 0;
-      fetch("/api/portfolio/positions").then((r) => r.json()).then((p) => {
-        const mv = p.data?.summary?.totalMarketValue ?? 0;
-        setPortfolioValue(mv + cash);
-        setLoadingPortfolio(false);
-      });
+    // Use performance API which computes live market value internally
+    fetch("/api/portfolio/performance").then((r) => r.json()).then((d) => {
+      const live = d.data?.portfolio?.livePortfolioValue ?? 0;
+      setPortfolioValue(live);
+      setLoadingPortfolio(false);
     }).catch(() => setLoadingPortfolio(false));
   }, []);
 
